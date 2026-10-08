@@ -1,0 +1,562 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+    <title>Add Expense - Expense Tracker</title>
+
+    <link
+        rel="stylesheet"
+        href="../css/style.css">
+
+</head>
+
+<body>
+
+    <!-- Header -->
+
+    <header class="dashboard-header">
+
+        <div class="brand">
+            💰 Expense Tracker
+        </div>
+
+        <div class="user-section">
+
+            <span>
+                👤 <strong>Admin</strong>
+            </span>
+
+            <button type="button" id="backBtn" class="back-btn">
+    ← Back
+</button>
+
+        </div>
+
+    </header>
+
+
+    <!-- Main -->
+
+    <main class="form-container">
+
+        <div class="page-title">
+
+            <h1>
+                ➕ Add Expense
+            </h1>
+
+            <p>
+                Add a new expense and enter the amount
+                given by each person.
+            </p>
+
+        </div>
+
+
+        <form id="expenseForm">
+
+
+            <!-- Expense Information -->
+
+            <section class="form-section">
+
+                <h2>
+                    Expense Information
+                </h2>
+
+
+                <div class="form-grid">
+
+
+                    <!-- Category -->
+
+                    <div class="form-group">
+
+                        <label for="category">
+                            Category
+                        </label>
+
+                        <select
+                            id="category"
+                            required>
+
+                            <option value="">
+                                Select category
+                            </option>
+
+                            <option value="Bus">
+                                🚌 Bus
+                            </option>
+
+                            <option value="Auto">
+                                🛺 Auto
+                            </option>
+
+                            <option value="Theatre">
+                                🎭 Theatre
+                            </option>
+
+                            <option value="Lunch">
+                                🍛 Lunch
+                            </option>
+
+                            <option value="Dinner">
+                                🍽️ Dinner
+                            </option>
+
+                            <option value="Snacks">
+                                🍿 Snacks
+                            </option>
+
+                            <option value="Petrol">
+                                ⛽ Petrol
+                            </option>
+
+                            <option value="Movie">
+                                🎬 Movie
+                            </option>
+
+                            <option value="Others">
+                                📌 Others
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Date -->
+
+                    <div class="form-group">
+
+                        <label for="expenseDate">
+                            Date
+                        </label>
+
+                        <input
+                            type="date"
+                            id="expenseDate"
+                            required>
+
+                    </div>
+
+
+                    <!-- Expense Name -->
+
+                    <div class="form-group">
+
+                        <label for="expenseName">
+                            Expense Name
+                        </label>
+
+                        <input
+                            type="text"
+                            id="expenseName"
+                            placeholder="Example: Dinner at ABC"
+                            required>
+
+                    </div>
+
+
+                    <!-- Total -->
+
+                    <div class="form-group">
+
+                        <label for="totalAmount">
+                            Total Amount (₹)
+                        </label>
+
+                        <input
+                            type="number"
+                            id="totalAmount"
+                            placeholder="0.00"
+                            min="1"
+                            step="0.01"
+                            required>
+
+                    </div>
+
+
+                    <!-- Spent By -->
+
+                    <div class="form-group">
+
+                        <label for="spentBy">
+                            Spent By
+                        </label>
+
+                        <select
+                            id="spentBy"
+                            required>
+
+                            <option value="">
+                                Select person
+                            </option>
+
+                            <option value="vetri">
+                                Vetrivel
+                            </option>
+
+                            <option value="nitheen">
+                                Nitheen
+                            </option>
+
+                            <option value="yash">
+                                Yaswanth
+                            </option>
+
+                            <option value="dharshu">
+                                Dharshini
+                            </option>
+
+                            <option value="mano">
+                                ManojKumar
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Additional Details -->
+
+                    <div class="form-group full-width">
+
+                        <label for="details">
+                            Additional Details
+                            <span class="optional">
+                                (Optional)
+                            </span>
+                        </label>
+
+                        <textarea
+                            id="details"
+                            rows="3"
+                            placeholder="Add any additional information...">
+                        </textarea>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Split Section -->
+
+            <section class="form-section">
+
+                <div class="section-title-row">
+
+                    <div>
+
+                        <h2>
+                            Split With
+                        </h2>
+
+                        <p class="section-description">
+                            Select the people involved and enter
+                            the exact amount given by each person.
+                        </p>
+
+                    </div>
+
+                    <button
+                        type="button"
+                        class="select-all-btn"
+                        id="togglePeopleBtn">
+
+                        Unselect All
+
+                    </button>
+
+                </div>
+
+
+                <!-- Vetrivel -->
+
+                <div class="person-row">
+
+                    <div class="person-check">
+
+                        <input
+                            type="checkbox"
+                            class="person-checkbox"
+                            id="vetriCheck"
+                            value="vetri">
+
+                        <label for="vetriCheck">
+                            Vetrivel
+                        </label>
+
+                    </div>
+
+
+                    <div class="person-amount-input">
+
+                        <span>₹</span>
+
+                        <input
+                            type="number"
+                            class="given-amount"
+                            id="vetriAmount"
+                            data-person="vetri"
+                            min="0"
+                            step="0.01"
+                            value="0"
+                            disabled>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Nitheen -->
+
+                <div class="person-row">
+
+                    <div class="person-check">
+
+                        <input
+                            type="checkbox"
+                            class="person-checkbox"
+                            id="nitheenCheck"
+                            value="nitheen">
+
+                        <label for="nitheenCheck">
+                            Nitheen
+                        </label>
+
+                    </div>
+
+
+                    <div class="person-amount-input">
+
+                        <span>₹</span>
+
+                        <input
+                            type="number"
+                            class="given-amount"
+                            id="nitheenAmount"
+                            data-person="nitheen"
+                            min="0"
+                            step="0.01"
+                            value="0"
+                            disabled>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Yaswanth -->
+
+                <div class="person-row">
+
+                    <div class="person-check">
+
+                        <input
+                            type="checkbox"
+                            class="person-checkbox"
+                            id="yashCheck"
+                            value="yash">
+
+                        <label for="yashCheck">
+                            Yaswanth
+                        </label>
+
+                    </div>
+
+
+                    <div class="person-amount-input">
+
+                        <span>₹</span>
+
+                        <input
+                            type="number"
+                            class="given-amount"
+                            id="yashAmount"
+                            data-person="yash"
+                            min="0"
+                            step="0.01"
+                            value="0"
+                            disabled>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Dharshini -->
+
+                <div class="person-row">
+
+                    <div class="person-check">
+
+                        <input
+                            type="checkbox"
+                            class="person-checkbox"
+                            id="dharshuCheck"
+                            value="dharshu">
+
+                        <label for="dharshuCheck">
+                            Dharshini
+                        </label>
+
+                    </div>
+
+
+                    <div class="person-amount-input">
+
+                        <span>₹</span>
+
+                        <input
+                            type="number"
+                            class="given-amount"
+                            id="dharshuAmount"
+                            data-person="dharshu"
+                            min="0"
+                            step="0.01"
+                            value="0"
+                            disabled>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ManojKumar -->
+
+                <div class="person-row">
+
+                    <div class="person-check">
+
+                        <input
+                            type="checkbox"
+                            class="person-checkbox"
+                            id="manoCheck"
+                            value="mano">
+
+                        <label for="manoCheck">
+                            ManojKumar
+                        </label>
+
+                    </div>
+
+
+                    <div class="person-amount-input">
+
+                        <span>₹</span>
+
+                        <input
+                            type="number"
+                            class="given-amount"
+                            id="manoAmount"
+                            data-person="mano"
+                            min="0"
+                            step="0.01"
+                            value="0"
+                            disabled>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Amount Summary -->
+
+                <div class="amount-summary">
+
+                    <div>
+
+                        <span>
+                            Total Expense
+                        </span>
+
+                        <strong id="displayTotal">
+                            ₹0
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Total Given
+                        </span>
+
+                        <strong id="displayGiven">
+                            ₹0
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Difference
+                        </span>
+
+                        <strong id="displayDifference">
+                            ₹0
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <p
+                    id="amountMessage"
+                    class="form-message">
+                </p>
+
+            </section>
+
+
+            <!-- Actions -->
+
+            <div class="form-actions">
+
+                <button
+                    type="button"
+                    class="cancel-btn"
+                    onclick="goBack()">
+
+                    Cancel
+
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="save-btn"
+                    id="saveExpenseBtn">
+
+                    Save Expense
+
+                </button>
+
+            </div>
+
+
+        </form>
+
+    </main>
+
+    <script src="../js/notifications.js"></script>
+    <script src="../js/add-expense.js"></script>
+
+</body>
+
+</html>

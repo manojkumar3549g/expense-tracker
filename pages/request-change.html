@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Request a Change - Expense Tracker</title>
+
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
+    <style>
+
+        .request-container {
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .request-header {
+            margin-bottom: 25px;
+        }
+
+        .request-header h1 {
+            margin-bottom: 8px;
+        }
+
+        .request-header p {
+            color: #666;
+        }
+
+        /* ========================================
+       TOP BACK BUTTON
+    ======================================== */
+
+    .top-back-btn {
+        margin-top: 15px;
+        padding: 10px 18px;
+        border: none;
+        border-radius: 8px;
+        background: #e9ecef;
+        color: #333;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .top-back-btn:hover {
+        background: #d9dde1;
+    }
+
+        .request-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #d5d5d5;
+            border-radius: 9px;
+            font-size: 15px;
+            box-sizing: border-box;
+        }
+
+        .form-group textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .current-value {
+            background: #f5f6f8;
+            color: #555;
+        }
+
+        .info-box {
+            background: #f0f7ff;
+            border-left: 4px solid #2878d7;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            color: #444;
+        }
+
+        .expense-info {
+            display: none;
+            background: #fafafa;
+            border: 1px solid #e4e4e4;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 22px;
+        }
+
+        .expense-info div {
+            margin-bottom: 8px;
+        }
+
+        .expense-info div:last-child {
+            margin-bottom: 0;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .submit-btn,
+        .back-btn {
+            border: none;
+            border-radius: 9px;
+            padding: 13px 22px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .submit-btn {
+            background: #2878d7;
+            color: white;
+            flex: 1;
+        }
+
+        .submit-btn:hover {
+            background: #1766c2;
+        }
+
+        .back-btn {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .back-btn:hover {
+            background: #dcdfe2;
+        }
+
+        .message {
+            display: none;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .message.success {
+            display: block;
+            background: #e8f7ed;
+            color: #18743a;
+        }
+
+        .message.error {
+            display: block;
+            background: #fdecec;
+            color: #b42318;
+        }
+
+        @media (max-width: 600px) {
+
+            .request-container {
+                margin: 20px auto;
+                padding: 0 14px;
+            }
+
+            .request-card {
+                padding: 20px;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
+
+            .submit-btn,
+            .back-btn {
+                width: 100%;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<header class="dashboard-header">
+
+    <div class="brand">
+        💰 Expense Tracker
+    </div>
+
+    <div class="user-section">
+
+        <span>
+            👤
+            <strong id="personName">
+                Person
+            </strong>
+        </span>
+
+        <button
+            type="button"
+            onclick="logout()"
+        >
+            Logout
+        </button>
+
+    </div>
+
+</header>
+
+
+<main class="request-container">
+
+    <section class="request-header">
+
+        <h1>
+            📝 Request a Change
+        </h1>
+
+        <p>
+            Submit a request to the Admin if any
+            expense information needs to be changed.
+        </p>
+
+        <button
+    type="button"
+    class="top-back-btn"
+    id="topBackBtn"
+>
+    ← Back to Dashboard
+</button>
+
+    </section>
+
+
+    <div
+        id="message"
+        class="message"
+    ></div>
+
+
+    <section class="request-card">
+
+        <div class="info-box">
+
+            🔒 <strong>Important:</strong>
+
+            You cannot directly modify expenses.
+            Your request will be reviewed by the Admin.
+
+        </div>
+
+
+        <form id="changeRequestForm">
+
+
+            <!-- EXPENSE -->
+
+            <div class="form-group">
+
+                <label for="expenseSelect">
+                    Select Expense
+                </label>
+
+                <select
+                    id="expenseSelect"
+                    required
+                >
+
+                    <option value="">
+                        -- Select an Expense --
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- EXPENSE INFORMATION -->
+
+            <div
+                id="expenseInfo"
+                class="expense-info"
+            >
+
+                <div>
+
+                    <strong>
+                        Expense:
+                    </strong>
+
+                    <span id="expenseName">
+                        -
+                    </span>
+
+                </div>
+
+
+                <div>
+
+                    <strong>
+                        Total:
+                    </strong>
+
+                    <span id="expenseTotal">
+                        -
+                    </span>
+
+                </div>
+
+
+                <div>
+
+                    <strong>
+                        Spent By:
+                    </strong>
+
+                    <span id="expenseSpentBy">
+                        -
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- FIELD -->
+
+            <div class="form-group">
+
+                <label for="fieldSelect">
+                    What do you want to change?
+                </label>
+
+                <select
+                    id="fieldSelect"
+                    required
+                >
+
+                    <option value="">
+                        -- Select Field --
+                    </option>
+
+                    <option value="myGivenAmount">
+                        My Given Amount
+                    </option>
+
+                    <option value="spentBy">
+                        Spent By
+                    </option>
+
+                    <option value="details">
+                        Expense Details
+                    </option>
+
+                    <option value="date">
+                        Date
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- CURRENT VALUE -->
+
+            <div class="form-group">
+
+                <label for="currentValue">
+                    Current Value
+                </label>
+
+                <input
+                    type="text"
+                    id="currentValue"
+                    class="current-value"
+                    readonly
+                    placeholder="Current value will appear here"
+                >
+
+            </div>
+
+
+            <!-- REQUESTED VALUE -->
+
+            <div class="form-group">
+
+                <label for="requestedValue">
+                    Requested Value
+                </label>
+
+                <input
+                    type="text"
+                    id="requestedValue"
+                    placeholder="Enter the new value"
+                    required
+                >
+
+            </div>
+
+
+            <!-- REASON -->
+
+            <div class="form-group">
+
+                <label for="reason">
+                    Reason for Change
+                </label>
+
+                <textarea
+                    id="reason"
+                    placeholder="Explain why this change is required..."
+                    required
+                ></textarea>
+
+            </div>
+
+
+            <!-- BUTTONS -->
+
+            <div class="button-row">
+
+                <button
+                    type="button"
+                    class="back-btn"
+                    id="backBtn"
+                >
+                    ← Back
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="submit-btn"
+                >
+                    📤 Submit Request
+                </button>
+
+            </div>
+
+        </form>
+
+    </section>
+
+</main>
+
+
+<!-- IMPORTANT: JS FILE IS LINKED HERE -->
+<script src="../js/notifications.js"></script>
+<script src="../js/request-change.js"></script>
+
+</body>
+
+</html>

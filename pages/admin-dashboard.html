@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Admin Dashboard - Expense Tracker</title>
+
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
+</head>
+
+
+<body>
+
+    <!-- =========================================
+         HEADER
+    ========================================== -->
+
+    <header class="dashboard-header">
+
+        <div class="brand">
+            💰 Expense Tracker
+        </div>
+
+
+        <div class="user-section">
+
+            <span>
+                👤
+                <strong id="adminName">
+                    Admin
+                </strong>
+            </span>
+
+
+            <button
+                type="button"
+                onclick="logout()"
+            >
+                Logout
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- =========================================
+         MAIN DASHBOARD
+    ========================================== -->
+
+    <main class="dashboard-container">
+
+
+        <!-- =====================================
+             WELCOME
+        ====================================== -->
+
+        <section class="welcome-section">
+
+            <h1>
+                Welcome, Admin 👋
+            </h1>
+
+            <p>
+                Manage expenses, people and change requests.
+            </p>
+
+        </section>
+
+
+
+        <!-- =====================================
+             STATISTICS
+        ====================================== -->
+
+        <section class="summary-cards">
+
+
+            <!-- Total People -->
+
+            <div class="summary-card">
+
+                <div class="card-icon">
+                    👥
+                </div>
+
+
+                <div>
+
+                    <p>
+                        Total People
+                    </p>
+
+                    <h2 id="peopleCount">
+                        5
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Total Expenses -->
+
+            <div class="summary-card">
+
+                <div class="card-icon">
+                    🧾
+                </div>
+
+
+                <div>
+
+                    <p>
+                        Total Expenses
+                    </p>
+
+                    <h2 id="expenseCount">
+                        0
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Total Amount -->
+
+            <div class="summary-card">
+
+                <div class="card-icon">
+                    💰
+                </div>
+
+
+                <div>
+
+                    <p>
+                        Total Amount
+                    </p>
+
+                    <h2 id="totalAmount">
+                        ₹0
+                    </h2>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Change Requests -->
+
+            <div class="summary-card request-card">
+
+                <div class="card-icon">
+                    🔔
+                </div>
+
+
+                <div>
+
+                    <p>
+                        Change Requests
+                    </p>
+
+                    <h2 id="requestCount">
+                        0
+                    </h2>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================
+             ADMINISTRATION MENU
+        ====================================== -->
+
+        <section class="dashboard-menu">
+
+
+            <h2>
+                Administration
+            </h2>
+
+
+            <div class="menu-grid">
+
+
+                <!-- =================================
+                     ADD EXPENSE
+                ================================== -->
+
+                <a
+                    href="add-expense.html"
+                    class="menu-card"
+                >
+
+                    <div class="menu-icon">
+                        ➕
+                    </div>
+
+
+                    <h3>
+                        Add Expense
+                    </h3>
+
+
+                    <p>
+                        Add a new expense and enter
+                        each person's amount.
+                    </p>
+
+                </a>
+
+
+
+                <!-- =================================
+                     ALL EXPENSES
+                ================================== -->
+
+                <a
+                    href="all-expenses.html"
+                    class="menu-card"
+                >
+
+                    <div class="menu-icon">
+                        📋
+                    </div>
+
+
+                    <h3>
+                        All Expenses
+                    </h3>
+
+
+                    <p>
+                        View and manage all recorded
+                        expenses.
+                    </p>
+
+                </a>
+
+
+
+                <!-- =================================
+                     CHANGE REQUESTS
+                ================================== -->
+
+                <a
+                    href="change-requests.html"
+                    class="menu-card request-menu"
+                >
+
+                    <div class="menu-icon">
+                        🔔
+                    </div>
+
+
+                    <h3>
+                        Change Requests
+                    </h3>
+
+
+                    <p>
+                        Review requests submitted
+                        by persons.
+                    </p>
+
+
+                    <span
+                        id="requestBadge"
+                        class="request-badge"
+                    >
+                        0
+                    </span>
+
+                </a>
+
+
+
+                <!-- =================================
+                     PEOPLE
+                ================================== -->
+
+                <a
+                    href="people.html"
+                    class="menu-card"
+                >
+
+                    <div class="menu-icon">
+                        👥
+                    </div>
+
+
+                    <h3>
+                        People
+                    </h3>
+
+
+                    <p>
+                        Manage the five people
+                        in the expense group.
+                    </p>
+
+                </a>
+
+
+
+                <!-- =================================
+                     FINAL BILL
+                ================================== -->
+
+                <a
+                    href="final-bill.html"
+                    class="menu-card"
+                >
+
+                    <div class="menu-icon">
+                        🧾
+                    </div>
+
+
+                    <h3>
+                        Final Bill
+                    </h3>
+
+
+                    <p>
+                        View the complete expense
+                        summary.
+                    </p>
+
+                </a>
+
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================
+             RECENT CHANGE REQUESTS
+        ====================================== -->
+
+        <section class="transactions-section">
+
+
+            <div class="section-header">
+
+                <h2>
+                    Recent Change Requests
+                </h2>
+
+
+                <span id="requestStatus">
+                    No pending requests
+                </span>
+
+            </div>
+
+
+
+            <div
+                id="recentRequests"
+                class="empty-state"
+            >
+
+                <div>
+                    🔔
+                </div>
+
+
+                <h3>
+                    No change requests
+                </h3>
+
+
+                <p>
+                    Requests from persons will appear here.
+                </p>
+
+            </div>
+
+        </section>
+
+
+    </main>
+
+
+
+    <!-- =========================================
+         JAVASCRIPT
+    ========================================== -->
+    <script src="../js/notifications.js"></script>
+    <script src="../js/admin-dashboard.js"></script>
+
+
+</body>
+
+</html>

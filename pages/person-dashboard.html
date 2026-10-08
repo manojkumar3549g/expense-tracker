@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>My Dashboard - Expense Tracker</title>
+
+    <link
+        rel="stylesheet"
+        href="../css/style.css"
+    >
+
+    <style>
+
+        /* ========================================
+           PERSON DASHBOARD
+        ======================================== */
+
+        .dashboard-menu {
+            margin-top: 35px;
+        }
+
+
+        /* ========================================
+           SUMMARY CARDS
+        ======================================== */
+
+        .summary-cards {
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, minmax(0, 1fr));
+
+            gap: 20px;
+        }
+
+
+        .summary-card {
+            min-height: 120px;
+        }
+
+
+        /* ========================================
+           MENU
+        ======================================== */
+
+        .menu-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, minmax(0, 1fr));
+
+            gap: 20px;
+        }
+
+
+        .menu-card {
+            position: relative;
+
+            display: block;
+
+            text-decoration: none;
+
+            color: inherit;
+
+            background: #ffffff;
+
+            border-radius: 16px;
+
+            padding: 25px;
+
+            box-shadow:
+                0 5px 20px
+                rgba(0, 0, 0, 0.07);
+
+            transition:
+                transform 0.2s ease,
+                box-shadow 0.2s ease;
+
+            cursor: pointer;
+        }
+
+
+        .menu-card:hover {
+
+            transform: translateY(-4px);
+
+            box-shadow:
+                0 10px 28px
+                rgba(0, 0, 0, 0.12);
+        }
+
+
+        .menu-card:active {
+
+            transform:
+                translateY(-1px);
+        }
+
+
+        .menu-icon {
+
+            font-size: 32px;
+
+            margin-bottom: 12px;
+        }
+
+
+        .menu-card h3 {
+
+            margin:
+                0 0 8px;
+
+            font-size: 19px;
+        }
+
+
+        .menu-card p {
+
+            margin: 0;
+
+            color: #666;
+
+            line-height: 1.5;
+        }
+
+
+        /* ========================================
+           TRANSACTIONS
+        ======================================== */
+
+        .transactions-section {
+
+            margin-top: 35px;
+        }
+
+
+        .transaction-list {
+
+            display: grid;
+
+            gap: 15px;
+        }
+
+
+        .transaction-card {
+
+            background: #ffffff;
+
+            border-radius: 14px;
+
+            padding: 20px;
+
+            box-shadow:
+                0 4px 18px
+                rgba(0, 0, 0, 0.06);
+        }
+
+
+        .transaction-main {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 14px;
+        }
+
+
+        .transaction-icon {
+
+            width: 48px;
+
+            height: 48px;
+
+            border-radius: 12px;
+
+            display: grid;
+
+            place-items: center;
+
+            background: #f1f5f9;
+
+            font-size: 23px;
+
+            flex-shrink: 0;
+        }
+
+
+        .transaction-main h3 {
+
+            margin:
+                0 0 5px;
+        }
+
+
+        .transaction-main p {
+
+            margin: 0;
+
+            color: #777;
+        }
+
+
+        .transaction-info {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, 1fr);
+
+            gap: 12px;
+
+            margin-top: 18px;
+
+            padding-top: 15px;
+
+            border-top:
+                1px solid #eee;
+        }
+
+
+        .transaction-info > div {
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 5px;
+        }
+
+
+        .transaction-info span {
+
+            color: #777;
+
+            font-size: 13px;
+        }
+
+
+        .transaction-info strong {
+
+            font-size: 16px;
+        }
+
+
+        .empty-state {
+
+            text-align: center;
+
+            padding: 35px 20px;
+        }
+
+
+        /* ========================================
+           MOBILE
+        ======================================== */
+
+        @media (max-width: 900px) {
+
+            .summary-cards {
+
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+
+            .menu-grid {
+
+                grid-template-columns:
+                    repeat(2, 1fr);
+            }
+
+        }
+
+
+        @media (max-width: 600px) {
+
+            .summary-cards {
+
+                grid-template-columns: 1fr;
+            }
+
+
+            .menu-grid {
+
+                grid-template-columns: 1fr;
+            }
+
+
+            .transaction-info {
+
+                grid-template-columns: 1fr;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- ========================================
+     HEADER
+======================================== -->
+
+<header class="dashboard-header">
+
+    <div class="brand">
+        💰 Expense Tracker
+    </div>
+
+
+    <div class="user-section">
+
+        <span>
+
+            👤
+
+            <strong id="personName">
+                User
+            </strong>
+
+        </span>
+
+
+        <button
+            type="button"
+            onclick="logout()"
+        >
+            Logout
+        </button>
+
+    </div>
+
+</header>
+
+
+<!-- ========================================
+     MAIN
+======================================== -->
+
+<main class="dashboard-container">
+
+
+    <!-- ====================================
+         WELCOME
+    ===================================== -->
+
+    <section class="welcome-section">
+
+        <h1>
+
+            Welcome,
+
+            <span id="welcomeName">
+                User
+            </span>
+
+            👋
+
+        </h1>
+
+
+        <p>
+            Here's your personal expense overview.
+        </p>
+
+    </section>
+
+
+
+    <!-- ====================================
+         SUMMARY
+    ===================================== -->
+
+    <section class="summary-cards">
+
+
+        <!-- MY SPENT -->
+
+        <div class="summary-card">
+
+            <div class="card-icon">
+                💸
+            </div>
+
+            <div>
+
+                <p>
+                    My Spent
+                </p>
+
+                <h2 id="mySpent">
+                    ₹0.00
+                </h2>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- MY GIVEN -->
+
+        <div class="summary-card">
+
+            <div class="card-icon">
+                💰
+            </div>
+
+            <div>
+
+                <p>
+                    My Given
+                </p>
+
+                <h2 id="myGiven">
+                    ₹0.00
+                </h2>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- MY EXPENSES -->
+
+        <a
+            href="personal-expenses.html"
+            class="summary-card"
+            style="
+                text-decoration:none;
+                color:inherit;
+                cursor:pointer;
+            "
+        >
+
+            <div class="card-icon">
+                🧾
+            </div>
+
+            <div>
+
+                <p>
+                    My Expenses
+                </p>
+
+                <h2 id="expenseCount">
+                    0
+                </h2>
+
+            </div>
+
+        </a>
+
+
+    </section>
+
+
+
+    <!-- ====================================
+         MY ACCOUNT
+    ===================================== -->
+
+    <section class="dashboard-menu">
+
+        <h2>
+            My Account
+        </h2>
+
+
+        <div class="menu-grid">
+
+
+            <!-- MY TRANSACTIONS -->
+
+            <a
+                href="personal-expenses.html"
+                class="menu-card"
+            >
+
+                <div class="menu-icon">
+                    📊
+                </div>
+
+                <h3>
+                    My Transactions
+                </h3>
+
+                <p>
+                    View your personal expense
+                    transactions.
+                </p>
+
+            </a>
+
+
+
+            <!-- REQUEST CHANGE -->
+
+            <a
+                href="request-change.html"
+                class="menu-card"
+            >
+
+                <div class="menu-icon">
+                    📝
+                </div>
+
+                <h3>
+                    Request a Change
+                </h3>
+
+                <p>
+                    Send a change request to Admin.
+                </p>
+
+            </a>
+
+
+
+            <!-- ALL EXPENSES -->
+
+            <a
+                href="all-expenses.html"
+                class="menu-card"
+            >
+
+                <div class="menu-icon">
+                    📋
+                </div>
+
+                <h3>
+                    All Expenses
+                </h3>
+
+                <p>
+                    View everyone's expenses.
+                </p>
+
+            </a>
+
+
+
+            <!-- FINAL BILL -->
+
+            <a
+                href="final-bill.html"
+                class="menu-card"
+            >
+
+                <div class="menu-icon">
+                    🧾
+                </div>
+
+                <h3>
+                    Final Bill
+                </h3>
+
+                <p>
+                    View the complete expense summary.
+                </p>
+
+            </a>
+
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ====================================
+         MY TRANSACTIONS PREVIEW
+    ===================================== -->
+
+    <section
+        class="transactions-section"
+        id="transactions"
+    >
+
+        <div class="section-header">
+
+            <h2>
+                My Transactions
+            </h2>
+
+            <span id="transactionStatus">
+                0 transactions
+            </span>
+
+        </div>
+
+
+        <div
+            id="transactionList"
+            class="transaction-list"
+        ></div>
+
+    </section>
+
+
+</main>
+
+<script src="../js/notifications.js"></script>
+<script src="../js/person-dashboard.js"></script>
+
+
+</body>
+
+</html>
