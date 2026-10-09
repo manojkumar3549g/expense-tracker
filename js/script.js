@@ -1,113 +1,67 @@
 
+const API_URL = "https://expense-tracker-api.manojkumar3549g.workers.dev";
+
 const loginForm = document.getElementById("loginForm");
 
-loginForm.addEventListener("submit", function (event) {
-
+loginForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
-    const username =
-        document.getElementById("username").value.trim();
+    const username = document
+        .getElementById("username")
+        .value.trim()
+        .toLowerCase();
 
-    const password =
-        document.getElementById("password").value.trim();
+    const password = document
+        .getElementById("password")
+        .value;
 
-    const message =
-        document.getElementById("loginMessage");
+    const message = document.getElementById("loginMessage");
 
+    message.textContent = "Signing in...";
+    message.style.color = "";
 
-    // Demo user accounts
+    try {
+        const response = await fetch(`${API_URL}/api/login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password
+            })
+        });
 
-    const users = {
+        const data = await response.json();
 
-        admin: {
-            password: "admin123",
-            role: "admin"
-        },
-
-        vetri: {
-            password: "1234",
-            role: "person",
-            name: "Vetrivel"
-        },
-
-        nitheen: {
-            password: "1234",
-            role: "person",
-            name: "Nitheen"
-        },
-
-        yash: {
-            password: "1234",
-            role: "person",
-            name: "Yaswanth"
-        },
-
-        dharshu: {
-            password: "1234",
-            role: "person",
-            name: "Dharshini"
-        },
-
-        mano: {
-            password: "1234",
-            role: "person",
-            name: "ManojKumar"
+        if (!response.ok) {
+            throw new Error(data.error || "Login failed.");
         }
 
-    };
+        if (!data.token || !data.user) {
+            throw new Error("Invalid response from server.");
+        }
 
+        // Store the server-issued login token and account details.
+        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("loggedInUser", data.user.username);
+        localStorage.setItem("userRole", data.user.role);
+        localStorage.setItem("personName", data.user.name);
 
-    // Check username
+        message.style.color = "green";
+        message.textContent = "Login successful! Redirecting...";
 
-    const user = users[username];
+        if (data.user.role === "admin") {
+            window.location.href = "pages/admin-dashboard.html";
+        } else {
+            window.location.href = "pages/person-dashboard.html";
+        }
 
-
-    if (!user) {
-
-        message.textContent =
-            "Username not found.";
-
+    } catch (error) {
         message.style.color = "red";
-
-        return;
-    }
-
-
-    // Check password
-
-    if (user.password !== password) {
-
         message.textContent =
-            "Incorrect password.";
-
-        message.style.color = "red";
-
-        return;
+            error.message === "Failed to fetch"
+                ? "Cannot connect to the server. Check your internet connection."
+                : error.message;
     }
-
-
-    // Store logged-in user
-
-    localStorage.setItem("loggedInUser", username);
-    localStorage.setItem("userRole", user.role);
-
-
-    // Automatically detect role
-
-    if (user.role === "admin") {
-
-        window.location.href =
-            "pages/admin-dashboard.html";
-
-    } else {
-
-        localStorage.setItem(
-            "personName",
-            user.name
-        );
-
-        window.location.href =
-            "pages/person-dashboard.html";
-    }
-
 });
