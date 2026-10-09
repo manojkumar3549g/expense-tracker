@@ -1,7 +1,9 @@
+
+const API_URL = "https://expense-tracker-api.manojkumar3549g.workers.dev";
+
 // ========================================
 // REQUEST CHANGE
 // ========================================
-
 
 // LOGIN CHECK
 
@@ -9,58 +11,30 @@ const username = localStorage.getItem("loggedInUser");
 const role = localStorage.getItem("userRole");
 const personName = localStorage.getItem("personName");
 
-if (!username || role !== "person") {
+if (
+    !username ||
+    role !== "person" ||
+    !localStorage.getItem("authToken")
+) {
     window.location.href = "../index.html";
 }
-
 
 // ========================================
 // ELEMENTS
 // ========================================
 
-const personNameElement =
-    document.getElementById("personName");
-
-const form =
-    document.getElementById("changeRequestForm");
-
-const expenseSelect =
-    document.getElementById("expenseSelect");
-
-const fieldSelect =
-    document.getElementById("fieldSelect");
-
-const currentValue =
-    document.getElementById("currentValue");
-
-const requestedValue =
-    document.getElementById("requestedValue");
-
-const reason =
-    document.getElementById("reason");
-
-const expenseInfo =
-    document.getElementById("expenseInfo");
-
-const expenseName =
-    document.getElementById("expenseName");
-
-const expenseTotal =
-    document.getElementById("expenseTotal");
-
-const expenseSpentBy =
-    document.getElementById("expenseSpentBy");
-
-const message =
-    document.getElementById("message");
-
-const backBtn =
-    document.getElementById("backBtn");
-
-
-// ========================================
-// PEOPLE
-// ========================================
+const personNameElement = document.getElementById("personName");
+const form = document.getElementById("changeRequestForm");
+const expenseSelect = document.getElementById("expenseSelect");
+const fieldSelect = document.getElementById("fieldSelect");
+const currentValue = document.getElementById("currentValue");
+const requestedValue = document.getElementById("requestedValue");
+const reason = document.getElementById("reason");
+const expenseInfo = document.getElementById("expenseInfo");
+const expenseName = document.getElementById("expenseName");
+const expenseTotal = document.getElementById("expenseTotal");
+const expenseSpentBy = document.getElementById("expenseSpentBy");
+const message = document.getElementById("message");
 
 const people = {
     vetri: "Vetrivel",
@@ -70,647 +44,527 @@ const people = {
     mano: "ManojKumar"
 };
 
+let expenses = [];
+let isSubmitting = false;
+
+const urlParams = new URLSearchParams(window.location.search);
+const requestedExpenseId = urlParams.get("expense");
 
 // ========================================
-// DISPLAY USER
+// INITIALIZE
 // ========================================
 
-personNameElement.textContent =
-    personName || people[username] || username;
+if (personNameElement) {
+    personNameElement.textContent =
+        personName || getPersonName(username);
+}
 
+if (expenseSelect) {
+    expenseSelect.addEventListener("change", showExpenseInfo);
+}
+
+if (fieldSelect) {
+    fieldSelect.addEventListener("change", function () {
+        updateCurrentValue();
+        updateRequestedField();
+    });
+}
+
+if (form) {
+    form.addEventListener("submit", submitChangeRequest);
+}
+
+const backBtn = document.getElementById("backBtn");
+const topBackBtn = document.getElementById("topBackBtn");
+
+[backBtn, topBackBtn].forEach(function (button) {
+    if (button) {
+        button.addEventListener("click", function () {
+            window.location.href = "person-dashboard.html";
+        });
+    }
+});
+
+loadExpenses();
+updateRequestedField();
+
+// ========================================
+// API REQUEST
+// ========================================
+
+async function apiRequest(endpoint, options = {}) {
+    const token = localStorage.getItem("authToken");
+
+    if (!token) {
+        redirectToLogin();
+        throw new Error("Please log in again.");
+    }
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+            ...(options.headers || {})
+        }
+    });
+
+    let data = {};
+
+    try {
+        data = await response.json();
+    } catch {
+        data = {};
+    }
+
+    if (response.status === 401 || response.status === 403) {
+        redirectToLogin();
+        throw new Error("Your session has expired. Please log in again.");
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            data.error || "The request could not be completed."
+        );
+    }
+
+    return data;
+}
+
+// ========================================
+// REDIRECT TO LOGIN
+// ========================================
+
+function redirectToLogin() {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("loggedInUser");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("personName");
+
+    window.location.href = "../index.html";
+}
 
 // ========================================
 // LOAD EXPENSES
 // ========================================
 
-let expenses = JSON.parse(
-    localStorage.getItem("expenses") || "[]"
-);
-
-
-// ========================================
-// URL PARAMETER
-// ========================================
-
-const urlParams =
-    new URLSearchParams(window.location.search);
-
-const requestedExpenseId =
-    urlParams.get("expense");
-
-
-// ========================================
-// CURRENCY
-// ========================================
-
-function formatCurrency(amount) {
-
-    return Number(amount || 0).toLocaleString(
-        "en-IN",
-        {
-            style: "currency",
-            currency: "INR",
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }
-    );
-}
-
-
-// ========================================
-// DATE
-// ========================================
-
-function formatDate(date) {
-
-    if (!date) {
-        return "-";
-    }
-
-    const parts = date.split("-");
-
-    if (parts.length !== 3) {
-        return date;
-    }
-
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-}
-
-
-// ========================================
-// LOAD EXPENSE DROPDOWN
-// ========================================
-
-function loadExpenses() {
-
-    expenseSelect.innerHTML = `
-        <option value="">
-            -- Select an Expense --
-        </option>
-    `;
-
-    if (expenses.length === 0) {
-
-        expenseSelect.innerHTML += `
-            <option value="" disabled>
-                No expenses available
-            </option>
-        `;
-
+async function loadExpenses() {
+    if (!expenseSelect) {
+        console.error("Expense dropdown was not found.");
         return;
     }
 
-    const sortedExpenses =
-        [...expenses].sort(function (a, b) {
-            return new Date(b.date) - new Date(a.date);
+    expenseSelect.innerHTML =
+        '<option value="">Loading expenses...</option>';
+
+    try {
+        const data = await apiRequest("/api/expenses");
+
+        expenses = Array.isArray(data)
+            ? data
+            : Array.isArray(data.expenses)
+                ? data.expenses
+                : [];
+
+        expenseSelect.innerHTML =
+            '<option value="">-- Select an Expense --</option>';
+
+        if (expenses.length === 0) {
+            expenseSelect.innerHTML +=
+                '<option value="" disabled>No expenses available</option>';
+
+            showMessage("No expenses are available to request changes for.", "error");
+            return;
+        }
+
+        const sortedExpenses = [...expenses].sort(function (a, b) {
+            return new Date(b.date || 0) - new Date(a.date || 0);
         });
 
-    sortedExpenses.forEach(function (expense) {
+        sortedExpenses.forEach(function (expense) {
+            const option = document.createElement("option");
 
-        const option =
-            document.createElement("option");
+            option.value = String(expense.id);
+            option.textContent =
+                `${expense.name || "Expense"} - ` +
+                `${formatCurrency(expense.totalAmount)} - ` +
+                `${formatDate(expense.date)}`;
 
-        option.value = expense.id;
+            expenseSelect.appendChild(option);
+        });
 
-        option.textContent =
-            `${expense.name} - ${formatCurrency(
-                expense.totalAmount
-            )} - ${formatDate(expense.date)}`;
-
-        expenseSelect.appendChild(option);
-    });
-
-
-    // Open selected expense from All Expenses
-
-    if (requestedExpenseId) {
-
-        const matchingExpense =
-            expenses.find(function (expense) {
-
-                return String(expense.id) ===
-                    String(requestedExpenseId);
-
+        // Select the expense linked from the personal expenses page.
+        if (requestedExpenseId) {
+            const matchingExpense = expenses.find(function (expense) {
+                return String(expense.id) === String(requestedExpenseId);
             });
 
-        if (matchingExpense) {
-
-            expenseSelect.value =
-                matchingExpense.id;
-
-            showExpenseInfo();
+            if (matchingExpense) {
+                expenseSelect.value = String(matchingExpense.id);
+                showExpenseInfo();
+            } else {
+                showMessage(
+                    "The selected expense was not found. Please choose an expense from the list.",
+                    "error"
+                );
+            }
         }
+    } catch (error) {
+        console.error("Loading expenses failed:", error);
+
+        expenseSelect.innerHTML =
+            '<option value="">Unable to load expenses</option>';
+
+        showMessage(
+            error.message || "Unable to load expenses. Please refresh.",
+            "error"
+        );
     }
 }
-
 
 // ========================================
 // GET SELECTED EXPENSE
 // ========================================
 
 function getSelectedExpense() {
+    if (!expenseSelect) {
+        return undefined;
+    }
 
-    const id =
-        expenseSelect.value;
+    const id = expenseSelect.value;
 
     return expenses.find(function (expense) {
-
-        return String(expense.id) ===
-            String(id);
-
+        return String(expense.id) === String(id);
     });
 }
-
 
 // ========================================
 // SHOW EXPENSE INFORMATION
 // ========================================
 
 function showExpenseInfo() {
-
-    const expense =
-        getSelectedExpense();
+    const expense = getSelectedExpense();
 
     if (!expense) {
+        if (expenseInfo) {
+            expenseInfo.style.display = "none";
+        }
 
-        expenseInfo.style.display = "none";
+        if (currentValue) {
+            currentValue.value = "";
+        }
 
         return;
     }
 
-    expenseInfo.style.display = "block";
+    if (expenseInfo) {
+        expenseInfo.style.display = "block";
+    }
 
-    expenseName.textContent =
-        expense.name || "-";
+    if (expenseName) {
+        expenseName.textContent = expense.name || "-";
+    }
 
-    expenseTotal.textContent =
-        formatCurrency(expense.totalAmount);
+    if (expenseTotal) {
+        expenseTotal.textContent = formatCurrency(expense.totalAmount);
+    }
 
-    expenseSpentBy.textContent =
-        people[expense.spentBy] ||
-        expense.spentBy ||
-        "-";
+    if (expenseSpentBy) {
+        expenseSpentBy.textContent = getPersonName(expense.spentBy);
+    }
 
     updateCurrentValue();
 }
-
 
 // ========================================
 // CURRENT VALUE
 // ========================================
 
 function updateCurrentValue() {
+    const expense = getSelectedExpense();
+    const field = fieldSelect ? fieldSelect.value : "";
 
-    const expense =
-        getSelectedExpense();
-
-    const field =
-        fieldSelect.value;
-
-    if (!expense || !field) {
-
-        currentValue.value = "";
-
+    if (!currentValue) {
         return;
     }
 
-    let value = "";
+    if (!expense || !field) {
+        currentValue.value = "";
+        return;
+    }
 
     switch (field) {
+        case "myGivenAmount": {
+            const splitAmounts = expense.splits || expense.split || {};
+            const value = Number(splitAmounts[username]) || 0;
 
-        case "myGivenAmount":
-
-            value =
-                expense.split &&
-                expense.split[username] !== undefined
-                    ? expense.split[username]
-                    : 0;
-
-            currentValue.value =
-                formatCurrency(value);
-
+            currentValue.value = formatCurrency(value);
             break;
-
+        }
 
         case "spentBy":
-
-            currentValue.value =
-                people[expense.spentBy] ||
-                expense.spentBy ||
-                "";
-
+            currentValue.value = expense.spentBy || "";
             break;
-
 
         case "details":
-
-            currentValue.value =
-                expense.details ||
-                "No details";
-
+            currentValue.value = expense.details || "No details";
             break;
-
 
         case "date":
-
-            currentValue.value =
-                expense.date ||
-                "";
-
+            currentValue.value = expense.date || "";
             break;
+
+        default:
+            currentValue.value = "";
     }
 }
-
 
 // ========================================
 // REQUESTED VALUE SETTINGS
 // ========================================
 
 function updateRequestedField() {
+    if (!requestedValue || !fieldSelect) {
+        return;
+    }
 
     requestedValue.value = "";
-
     requestedValue.type = "text";
-
     requestedValue.removeAttribute("min");
     requestedValue.removeAttribute("step");
 
     switch (fieldSelect.value) {
-
         case "myGivenAmount":
-
             requestedValue.type = "number";
-
             requestedValue.step = "0.01";
-
             requestedValue.min = "0";
-
-            requestedValue.placeholder =
-                "Example: 250";
-
+            requestedValue.placeholder = "Example: 250";
             break;
-
 
         case "spentBy":
-
-            requestedValue.placeholder =
-                "Example: vetri";
-
+            requestedValue.placeholder = "Enter username, e.g. vetri";
             break;
-
 
         case "details":
-
-            requestedValue.placeholder =
-                "Enter updated expense details";
-
+            requestedValue.placeholder = "Enter updated expense details";
             break;
-
 
         case "date":
-
             requestedValue.type = "date";
-
             requestedValue.placeholder = "";
-
             break;
 
-
         default:
-
-            requestedValue.placeholder =
-                "Enter the new value";
+            requestedValue.placeholder = "Enter the new value";
     }
 }
 
-
 // ========================================
-// EXPENSE CHANGE
+// SUBMIT CHANGE REQUEST
 // ========================================
 
-expenseSelect.addEventListener(
-    "change",
-    function () {
+async function submitChangeRequest(event) {
+    event.preventDefault();
 
-        showExpenseInfo();
-
+    if (isSubmitting) {
+        return;
     }
-);
 
+    const expense = getSelectedExpense();
 
-// ========================================
-// FIELD CHANGE
-// ========================================
-
-fieldSelect.addEventListener(
-    "change",
-    function () {
-
-        updateCurrentValue();
-
-        updateRequestedField();
-
+    if (!expense) {
+        showMessage("Please select a valid expense.", "error");
+        return;
     }
-);
 
+    const field = fieldSelect ? fieldSelect.value : "";
+    const newValue = requestedValue
+        ? requestedValue.value.trim()
+        : "";
+    const requestReason = reason
+        ? reason.value.trim()
+        : "";
 
-// ========================================
-// SUBMIT REQUEST
-// ========================================
+    if (!field) {
+        showMessage("Please select what you want to change.", "error");
+        return;
+    }
 
-form.addEventListener(
-    "submit",
-    function (event) {
+    if (!newValue) {
+        showMessage("Please enter the requested value.", "error");
+        return;
+    }
 
-        event.preventDefault();
+    if (!requestReason) {
+        showMessage("Please enter a reason.", "error");
+        return;
+    }
 
-        const expense =
-            getSelectedExpense();
+    // Validate the requested amount.
+    if (field === "myGivenAmount") {
+        const amount = Number(newValue);
 
-        if (!expense) {
-
-            showMessage(
-                "Please select an expense.",
-                "error"
-            );
-
+        if (!Number.isFinite(amount) || amount < 0) {
+            showMessage("Please enter a valid amount.", "error");
             return;
         }
+    }
 
-        const field =
-            fieldSelect.value;
+    // Validate the requested payer username.
+    let finalValue = newValue;
 
-        const newValue =
-            requestedValue.value.trim();
+    if (field === "spentBy") {
+        finalValue = newValue.toLowerCase();
 
-        const requestReason =
-            reason.value.trim();
-
-
-        if (!field) {
-
+        if (!Object.prototype.hasOwnProperty.call(people, finalValue)) {
             showMessage(
-                "Please select what you want to change.",
+                "Enter a valid username: vetri, nitheen, yash, dharshu or mano.",
                 "error"
             );
-
             return;
         }
+    }
 
+    // Prepare the request body expected by the Worker API.
+    const requestBody = {
+        expenseId: expense.id,
+        field: field,
+        requestedValue:
+            field === "myGivenAmount"
+                ? Number(finalValue)
+                : finalValue,
+        reason: requestReason
+    };
 
-        if (!newValue) {
+    isSubmitting = true;
 
-            showMessage(
-                "Please enter the requested value.",
-                "error"
-            );
+    const submitButton = form.querySelector(
+        'button[type="submit"], input[type="submit"]'
+    );
 
-            return;
+    if (submitButton) {
+        submitButton.disabled = true;
+
+        if (submitButton.tagName === "BUTTON") {
+            submitButton.dataset.originalText =
+                submitButton.textContent;
+
+            submitButton.textContent = "Submitting...";
         }
+    }
 
-
-        if (!requestReason) {
-
-            showMessage(
-                "Please enter a reason.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        // Validate amount
-
-        if (field === "myGivenAmount") {
-
-            const amount =
-                Number(newValue);
-
-            if (
-                Number.isNaN(amount) ||
-                amount < 0
-            ) {
-
-                showMessage(
-                    "Please enter a valid amount.",
-                    "error"
-                );
-
-                return;
-            }
-        }
-
-
-        // Validate spent-by username
-
-        if (field === "spentBy") {
-
-            const requestedUsername =
-                newValue.toLowerCase();
-
-            if (!people[requestedUsername]) {
-
-                showMessage(
-                    "Enter a valid person username: vetri, nitheen, yash, dharshu or mano.",
-                    "error"
-                );
-
-                return;
-            }
-        }
-
-
-        // LOAD REQUESTS
-
-        const requests =
-            JSON.parse(
-                localStorage.getItem(
-                    "changeRequests"
-                ) || "[]"
-            );
-
-
-        // PREVENT DUPLICATE PENDING REQUEST
-
-        const duplicateRequest =
-            requests.some(function (request) {
-
-                return (
-                    String(request.expenseId) ===
-                    String(expense.id)
-
-                    &&
-
-                    request.requestedBy ===
-                    username
-
-                    &&
-
-                    (
-                        request.field === field ||
-                        request.fieldName === field
-                    )
-
-                    &&
-
-                    request.status ===
-                    "pending"
-                );
-
-            });
-
-
-        if (duplicateRequest) {
-
-            showMessage(
-                "You already have a pending request for this field.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        // CREATE REQUEST
-
-        const request = {
-
-            id: Date.now(),
-
-            expenseId: expense.id,
-
-            expenseName:
-                expense.name,
-
-            requestedBy:
-                username,
-
-            personName:
-                personName ||
-                people[username],
-
-            field:
-                field,
-
-            currentValue:
-                getRawCurrentValue(
-                    expense,
-                    field
-                ),
-
-            requestedValue:
-                field === "spentBy"
-                    ? newValue.toLowerCase()
-                    : newValue,
-
-            reason:
-                requestReason,
-
-            status:
-                "pending",
-
-            createdAt:
-                new Date().toISOString()
-        };
-
-
-        requests.push(request);
-
-
-        localStorage.setItem(
-            "changeRequests",
-            JSON.stringify(requests)
-        );
-
-
-        // SUCCESS
+    try {
+        await apiRequest("/api/change-requests", {
+            method: "POST",
+            body: JSON.stringify(requestBody)
+        });
 
         showMessage(
             "✓ Change request submitted successfully. Admin will review it.",
             "success"
         );
 
-
         form.reset();
 
-        currentValue.value = "";
+        if (currentValue) {
+            currentValue.value = "";
+        }
 
-        expenseInfo.style.display = "none";
+        if (expenseInfo) {
+            expenseInfo.style.display = "none";
+        }
 
-
-        // RETURN TO DASHBOARD
-
-        setTimeout(function () {
-
-            window.location.href =
-                "person-dashboard.html";
-
+        // Return to the dashboard after successful submission.
+        window.setTimeout(function () {
+            window.location.href = "person-dashboard.html";
         }, 1200);
+    } catch (error) {
+        console.error("Submitting change request failed:", error);
 
-    }
-);
+        showMessage(
+            error.message || "Unable to submit your request. Please try again.",
+            "error"
+        );
+    } finally {
+        isSubmitting = false;
 
+        if (submitButton) {
+            submitButton.disabled = false;
 
-// ========================================
-// RAW CURRENT VALUE
-// ========================================
+            if (
+                submitButton.tagName === "BUTTON" &&
+                submitButton.dataset.originalText
+            ) {
+                submitButton.textContent =
+                    submitButton.dataset.originalText;
 
-function getRawCurrentValue(
-    expense,
-    field
-) {
-
-    switch (field) {
-
-        case "myGivenAmount":
-
-            return (
-                expense.split &&
-                expense.split[username] !== undefined
-            )
-                ? Number(
-                    expense.split[username]
-                )
-                : 0;
-
-
-        case "spentBy":
-
-            return expense.spentBy || "";
-
-
-        case "details":
-
-            return expense.details || "";
-
-
-        case "date":
-
-            return expense.date || "";
-
-
-        default:
-
-            return "";
+                delete submitButton.dataset.originalText;
+            }
+        }
     }
 }
 
+// ========================================
+// GET PERSON NAME
+// ========================================
+
+function getPersonName(personUsername) {
+    return people[personUsername] || personUsername || "-";
+}
+
+// ========================================
+// CURRENCY
+// ========================================
+
+function formatCurrency(amount) {
+    return Number(amount || 0).toLocaleString("en-IN", {
+        style: "currency",
+        currency: "INR",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+// ========================================
+// DATE
+// ========================================
+
+function formatDate(date) {
+    if (!date) {
+        return "-";
+    }
+
+    const match = String(date).match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+    if (match) {
+        return `${match[3]}-${match[2]}-${match[1]}`;
+    }
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+        return String(date);
+    }
+
+    return parsedDate.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+    });
+}
 
 // ========================================
 // MESSAGE
 // ========================================
 
-function showMessage(
-    text,
-    type
-) {
+function showMessage(text, type) {
+    if (!message) {
+        console.log(text);
+        return;
+    }
 
-    message.textContent =
-        text;
-
-    message.className =
-        "message " + type;
+    message.textContent = text;
+    message.className = `message ${type}`;
 
     window.scrollTo({
         top: 0,
@@ -718,70 +572,15 @@ function showMessage(
     });
 }
 
-
-// ========================================
-// BACK BUTTON
-// ========================================
-
-backBtn.addEventListener(
-    "click",
-    function () {
-
-        window.location.href =
-            "person-dashboard.html";
-
-    }
-);
-
-
 // ========================================
 // LOGOUT
 // ========================================
 
 function logout() {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("loggedInUser");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("personName");
 
-    localStorage.removeItem(
-        "loggedInUser"
-    );
-
-    localStorage.removeItem(
-        "userRole"
-    );
-
-    localStorage.removeItem(
-        "personName"
-    );
-
-    window.location.href =
-        "../index.html";
-}
-
-
-// ========================================
-// INITIAL LOAD
-// ========================================
-
-loadExpenses();
-
-updateRequestedField();
-
-// ========================================
-// TOP BACK BUTTON
-// ========================================
-
-const topBackBtn =
-    document.getElementById("topBackBtn");
-
-if (topBackBtn) {
-
-    topBackBtn.addEventListener(
-        "click",
-        function () {
-
-            window.location.href =
-                "person-dashboard.html";
-
-        }
-    );
-
+    window.location.href = "../index.html";
 }

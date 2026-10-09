@@ -1,715 +1,538 @@
+
 // ========================================
 // PEOPLE MANAGEMENT
 // ========================================
 
+const API_URL =
+    "https://expense-tracker-api.manojkumar3549g.workers.dev";
 
-// ----------------------------------------
+// ========================================
 // ADMIN ACCESS
-// ----------------------------------------
+// ========================================
 
-const role =
-    localStorage.getItem("userRole");
+const role = localStorage.getItem("userRole");
+const token = localStorage.getItem("authToken");
 
-
-if (role !== "admin") {
-
-    window.location.href =
-        "../index.html";
-
+if (role !== "admin" || !token) {
+    window.location.href = "../index.html";
 }
 
-
-// ----------------------------------------
+// ========================================
 // ELEMENTS
-// ----------------------------------------
+// ========================================
 
-const peopleGrid =
-    document.getElementById("peopleGrid");
+const peopleGrid = document.getElementById("peopleGrid");
+const peopleCountText = document.getElementById("peopleCountText");
+const personModal = document.getElementById("personModal");
+const personForm = document.getElementById("personForm");
+const modalTitle = document.getElementById("modalTitle");
+const personName = document.getElementById("personName");
+const personUsername = document.getElementById("personUsername");
+const personPassword = document.getElementById("personPassword");
 
-const peopleCountText =
-    document.getElementById(
-        "peopleCountText"
-    );
+// ========================================
+// DATA
+// ========================================
 
-const personModal =
-    document.getElementById("personModal");
+let people = [];
+let editingUsername = null;
+let isSaving = false;
 
-const personForm =
-    document.getElementById("personForm");
+// ========================================
+// HELPERS
+// ========================================
 
-const modalTitle =
-    document.getElementById("modalTitle");
+function escapeHTML(value) {
+    const div = document.createElement("div");
+    div.textContent = value ?? "";
+    return div.innerHTML;
+}
 
-const personName =
-    document.getElementById("personName");
+async function showMessage(message, type = "info", title = "") {
+    if (typeof showAlert === "function") {
+        await showAlert(message, type, title);
+    } else {
+        window.alert(message);
+    }
+}
 
-const personUsername =
-    document.getElementById(
-        "personUsername"
-    );
-
-const personPassword =
-    document.getElementById(
-        "personPassword"
-    );
-
-
-// ----------------------------------------
-// INITIAL PEOPLE
-// ----------------------------------------
-
-const defaultPeople = [
-
-    {
-        name: "Vetrivel",
-        username: "vetri",
-        password: "1234",
-        role: "person",
-        active: true
-    },
-
-    {
-        name: "Nitheen",
-        username: "nitheen",
-        password: "1234",
-        role: "person",
-        active: true
-    },
-
-    {
-        name: "Yaswanth",
-        username: "yash",
-        password: "1234",
-        role: "person",
-        active: true
-    },
-
-    {
-        name: "Dharshini",
-        username: "dharshu",
-        password: "1234",
-        role: "person",
-        active: true
-    },
-
-    {
-        name: "ManojKumar",
-        username: "mano",
-        password: "1234",
-        role: "person",
-        active: true
+async function confirmAction(message) {
+    if (typeof showConfirm === "function") {
+        return await showConfirm(
+            message,
+            "Confirm Action",
+            "Continue",
+            "Cancel"
+        );
     }
 
-];
-
-
-// ----------------------------------------
-// LOAD PEOPLE
-// ----------------------------------------
-
-let people =
-    JSON.parse(
-        localStorage.getItem("people")
-    );
-
-
-if (!Array.isArray(people)) {
-
-    people = defaultPeople;
-
-    savePeople();
-
+    return window.confirm(message);
 }
 
+async function apiRequest(path, options = {}) {
+    const response = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            ...(options.body ? { "Content-Type": "application/json" } : {}),
+            ...(options.headers || {})
+        }
+    });
 
-// ----------------------------------------
-// EDITING USERNAME
-// ----------------------------------------
+    const data = await response.json().catch(() => ({}));
 
-let editingUsername = null;
+    if (response.status === 401 || response.status === 403) {
+        if (data.error) {
+            throw new Error(data.error);
+        }
 
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("loggedInUser");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("personName");
 
-// ----------------------------------------
-// SAVE
-// ----------------------------------------
+        window.location.href = "../index.html";
+        throw new Error("Your session has expired. Please log in again.");
+    }
 
-function savePeople() {
+    if (!response.ok) {
+        throw new Error(data.error || "The request failed.");
+    }
 
-    localStorage.setItem(
-        "people",
-        JSON.stringify(people)
-    );
-
+    return data;
 }
 
+// ========================================
+// LOAD PEOPLE FROM CLOUDFLARE
+// ========================================
 
-// ----------------------------------------
-// RENDER
-// ----------------------------------------
+async function loadPeople() {
+    if (!peopleGrid) return;
+
+    peopleGrid.innerHTML = `
+        <div class="empty-state">
+            <h3>Loading people...</h3>
+        </div>
+    `;
+
+    try {
+        const data = await apiRequest("/api/people");
+
+        people = (Array.isArray(data) ? data : data.people || [])
+            .map(function (person) {
+                return {
+                    name: person.name || person.username,
+                    username: person.username,
+                    role: person.role || "person",
+                    active: person.enabled === true ||
+                            person.enabled === 1
+                };
+            });
+
+        renderPeople();
+    } catch (error) {
+        console.error("Loading people failed:", error);
+
+        peopleGrid.innerHTML = `
+            <div class="empty-state">
+                <h3>Unable to load people</h3>
+                <p>${escapeHTML(error.message)}</p>
+                <button type="button" id="retryPeopleBtn">
+                    Try Again
+                </button>
+            </div>
+        `;
+
+        const retryButton = document.getElementById("retryPeopleBtn");
+
+        if (retryButton) {
+            retryButton.addEventListener("click", loadPeople);
+        }
+    }
+}
+
+// ========================================
+// RENDER PEOPLE
+// ========================================
 
 function renderPeople() {
+    if (!peopleGrid) return;
 
     peopleGrid.innerHTML = "";
 
-
-    peopleCountText.textContent =
-        `${people.length} ${
-            people.length === 1
-                ? "person"
-                : "people"
-        }`;
-
-
-    if (people.length === 0) {
-
-        peopleGrid.innerHTML = `
-
-            <div class="empty-state">
-
-                <h3>
-                    No people found
-                </h3>
-
-                <p>
-                    Add a person to get started.
-                </p>
-
-            </div>
-
-        `;
-
-        return;
-
+    if (peopleCountText) {
+        peopleCountText.textContent =
+            `${people.length} ${people.length === 1 ? "person" : "people"}`;
     }
 
+    if (people.length === 0) {
+        peopleGrid.innerHTML = `
+            <div class="empty-state">
+                <h3>No people found</h3>
+                <p>Add a person to get started.</p>
+            </div>
+        `;
+        return;
+    }
 
-    people.forEach(
-        function (person) {
-
-            peopleGrid.appendChild(
-                createPersonCard(person)
-            );
-
-        }
-    );
-
+    people.forEach(function (person) {
+        peopleGrid.appendChild(createPersonCard(person));
+    });
 }
 
-
-// ----------------------------------------
+// ========================================
 // PERSON CARD
-// ----------------------------------------
+// ========================================
 
 function createPersonCard(person) {
+    const card = document.createElement("div");
+    card.className = "person-card";
 
-    const card =
-        document.createElement("div");
-
-    card.className =
-        "person-card";
-
-
-    const statusClass =
-        person.active
-            ? "active"
-            : "inactive";
-
-
-    const statusText =
-        person.active
-            ? "Active"
-            : "Inactive";
-
+    const statusClass = person.active ? "active" : "inactive";
+    const statusText = person.active ? "Active" : "Inactive";
 
     card.innerHTML = `
-
         <div class="person-top">
-
-            <div class="person-avatar">
-                👤
-            </div>
-
+            <div class="person-avatar">👤</div>
 
             <div>
-
                 <h2 class="person-name">
                     ${escapeHTML(person.name)}
                 </h2>
 
-                <div class="person-role">
-                    Person
-                </div>
-
+                <div class="person-role">Person</div>
             </div>
-
         </div>
 
-
         <div class="person-details">
-
             <div class="detail-row">
-
-                <span class="detail-label">
-                    Username
-                </span>
-
+                <span class="detail-label">Username</span>
                 <span class="detail-value">
                     ${escapeHTML(person.username)}
                 </span>
-
             </div>
 
-
             <div class="detail-row">
-
-                <span class="detail-label">
-                    Role
-                </span>
-
-                <span class="detail-value">
-                    Person
-                </span>
-
+                <span class="detail-label">Role</span>
+                <span class="detail-value">Person</span>
             </div>
 
-
             <div class="detail-row">
-
-                <span class="detail-label">
-                    Account
-                </span>
-
+                <span class="detail-label">Account</span>
                 <span class="detail-value">
-
-                    <span
-                        class="account-status ${statusClass}"
-                    >
+                    <span class="account-status ${statusClass}">
                         ${statusText}
                     </span>
-
                 </span>
-
             </div>
-
         </div>
 
-
         <div class="person-actions">
-
             <button
                 type="button"
                 class="person-action-btn edit-person"
-                onclick="editPerson('${escapeAttribute(person.username)}')"
-            >
-                ✏️ Edit
-            </button>
-
+                data-action="edit"
+                data-username="${escapeHTML(person.username)}"
+            >✏️ Edit</button>
 
             <button
                 type="button"
                 class="person-action-btn toggle-person"
-                onclick="togglePerson('${escapeAttribute(person.username)}')"
-            >
-                ${
-                    person.active
-                        ? "🔒 Disable"
-                        : "🔓 Enable"
-                }
-            </button>
-
+                data-action="toggle"
+                data-username="${escapeHTML(person.username)}"
+                disabled
+                title="Account enable/disable API is not available yet"
+            >${person.active ? "🔒 Disable" : "🔓 Enable"}</button>
         </div>
-
     `;
 
-
     return card;
-
 }
 
+// ========================================
+// CARD BUTTONS
+// ========================================
 
-// ----------------------------------------
-// ADD PERSON
-// ----------------------------------------
+if (peopleGrid) {
+    peopleGrid.addEventListener("click", function (event) {
+        const button = event.target.closest("button[data-action]");
+
+        if (!button) return;
+
+        const action = button.dataset.action;
+        const username = button.dataset.username;
+
+        if (action === "edit") {
+            editPerson(username);
+        } else if (action === "toggle") {
+            togglePerson(username);
+        }
+    });
+}
+
+// ========================================
+// ADD PERSON MODAL
+// ========================================
 
 function openAddPersonModal() {
-
     editingUsername = null;
 
-    modalTitle.textContent =
-        "Add Person";
+    if (modalTitle) {
+        modalTitle.textContent = "Add Person";
+    }
 
-    personForm.reset();
+    if (personForm) {
+        personForm.reset();
+    }
 
-    personPassword.required = true;
+    if (personUsername) {
+        personUsername.disabled = false;
+    }
 
-    personModal.classList.add("show");
+    if (personPassword) {
+        personPassword.required = true;
+        personPassword.value = "";
+        personPassword.minLength = 8;
+        personPassword.placeholder = "At least 8 characters";
+    }
 
+    if (personModal) {
+        personModal.classList.add("show");
+    }
 }
 
+window.openAddPersonModal = openAddPersonModal;
 
-// ----------------------------------------
+// ========================================
 // EDIT PERSON
-// ----------------------------------------
+// ========================================
 
 function editPerson(username) {
-
-    const person =
-        people.find(
-            function (item) {
-
-                return item.username === username;
-
-            }
-        );
-
+    const person = people.find(function (item) {
+        return item.username === username;
+    });
 
     if (!person) {
-
+        showMessage("Person not found.", "error", "Not Found");
         return;
-
     }
 
+    editingUsername = username;
 
-    editingUsername =
-        username;
+    if (modalTitle) {
+        modalTitle.textContent = "Edit Person";
+    }
 
+    if (personName) {
+        personName.value = person.name;
+    }
 
-    modalTitle.textContent =
-        "Edit Person";
+    if (personUsername) {
+        personUsername.value = person.username;
+        personUsername.disabled = true;
+    }
 
+    if (personPassword) {
+        personPassword.value = "";
+        personPassword.required = false;
+        personPassword.placeholder =
+            "Editing is not available through the current API";
+        personPassword.disabled = true;
+    }
 
-    personName.value =
-        person.name;
+    if (personModal) {
+        personModal.classList.add("show");
+    }
 
-
-    personUsername.value =
-        person.username;
-
-
-    personPassword.value =
-        "";
-
-
-    personPassword.required = false;
-
-
-    personModal.classList.add("show");
-
+    showMessage(
+        "The current API supports adding people, but does not support editing existing accounts yet.",
+        "info",
+        "Editing Unavailable"
+    );
 }
 
+window.editPerson = editPerson;
 
-// ----------------------------------------
+// ========================================
 // CLOSE MODAL
-// ----------------------------------------
+// ========================================
 
 function closePersonModal() {
-
-    personModal.classList.remove(
-        "show"
-    );
+    if (personModal) {
+        personModal.classList.remove("show");
+    }
 
     editingUsername = null;
 
-    personForm.reset();
+    if (personForm) {
+        personForm.reset();
+    }
 
+    if (personUsername) {
+        personUsername.disabled = false;
+    }
+
+    if (personPassword) {
+        personPassword.disabled = false;
+        personPassword.required = true;
+        personPassword.placeholder = "At least 8 characters";
+    }
 }
 
+window.closePersonModal = closePersonModal;
 
-// ----------------------------------------
-// SUBMIT FORM
-// ----------------------------------------
+// ========================================
+// SUBMIT FORM - ADD PERSON
+// ========================================
 
-personForm.addEventListener(
-    "submit",
-    function (event) {
-
+if (personForm) {
+    personForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
+        if (isSaving) return;
 
-        const name =
-            personName.value.trim();
+        const name = personName.value.trim();
+        const username = personUsername.value.trim().toLowerCase();
+        const password = personPassword.value;
 
-
-        const username =
-            personUsername.value.trim();
-
-
-        const password =
-            personPassword.value;
-
-
-        if (!name || !username) {
-
-            alert(
-                "Please enter name and username."
+        if (editingUsername) {
+            await showMessage(
+                "Editing existing accounts is not supported by the current API. No changes were saved.",
+                "warning",
+                "Editing Unavailable"
             );
-
             return;
-
         }
 
+        if (!name || !username || !password) {
+            await showMessage(
+                "Please enter the person's name, username and password.",
+                "warning",
+                "Missing Information"
+            );
+            return;
+        }
 
-        // --------------------------------
-        // ADD
-        // --------------------------------
+        if (!/^[a-z0-9_]+$/.test(username)) {
+            await showMessage(
+                "Username can contain lowercase letters, numbers and underscores only.",
+                "warning",
+                "Invalid Username"
+            );
+            return;
+        }
 
-        if (!editingUsername) {
+        if (password.length < 8) {
+            await showMessage(
+                "Password must be at least 8 characters long.",
+                "warning",
+                "Password Too Short"
+            );
+            return;
+        }
 
-            const exists =
-                people.some(
-                    function (person) {
+        const duplicate = people.some(function (person) {
+            return person.username.toLowerCase() === username;
+        });
 
-                        return (
-                            person.username
-                                .toLowerCase() ===
-                            username.toLowerCase()
-                        );
+        if (duplicate) {
+            await showMessage(
+                "This username already exists.",
+                "error",
+                "Duplicate Username"
+            );
+            return;
+        }
 
-                    }
-                );
+        isSaving = true;
 
+        const submitButton =
+            personForm.querySelector('button[type="submit"]');
 
-            if (exists) {
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
 
-                alert(
-                    "This username already exists."
-                );
-
-                return;
-
-            }
-
-
-            if (!password) {
-
-                alert(
-                    "Please enter a password."
-                );
-
-                return;
-
-            }
-
-
-            people.push({
-
-                name: name,
-
-                username: username,
-
-                password: password,
-
-                role: "person",
-
-                active: true
-
+        try {
+            await apiRequest("/api/people", {
+                method: "POST",
+                body: JSON.stringify({
+                    name: name,
+                    username: username,
+                    password: password
+                })
             });
-
-        }
-
-
-        // --------------------------------
-        // EDIT
-        // --------------------------------
-
-        else {
-
-            const person =
-                people.find(
-                    function (item) {
-
-                        return (
-                            item.username ===
-                            editingUsername
-                        );
-
-                    }
-                );
-
-
-            if (!person) {
-
-                alert(
-                    "Person not found."
-                );
-
-                return;
-
-            }
-
-
-            // Prevent duplicate username
-
-            const duplicate =
-                people.some(
-                    function (item) {
-
-                        return (
-                            item.username
-                                .toLowerCase() ===
-                            username.toLowerCase() &&
-                            item.username !==
-                            editingUsername
-                        );
-
-                    }
-                );
-
-
-            if (duplicate) {
-
-                alert(
-                    "This username is already used."
-                );
-
-                return;
-
-            }
-
-
-            person.name =
-                name;
-
-
-            person.username =
-                username;
-
-
-            if (password) {
-
-                person.password =
-                    password;
-
-            }
-
-        }
-
-
-        savePeople();
-
-
-        closePersonModal();
-
-
-        renderPeople();
-
-
-        alert(
-            editingUsername
-                ? "Person updated successfully."
-                : "Person added successfully."
-        );
-
-    }
-);
-
-
-// ----------------------------------------
-// ENABLE / DISABLE
-// ----------------------------------------
-
-function togglePerson(username) {
-
-    const person =
-        people.find(
-            function (item) {
-
-                return item.username === username;
-
-            }
-        );
-
-
-    if (!person) {
-
-        return;
-
-    }
-
-
-    const action =
-        person.active
-            ? "disable"
-            : "enable";
-
-
-    const confirmed =
-        confirm(
-            `Are you sure you want to ${action} ${person.name}'s account?`
-        );
-
-
-    if (!confirmed) {
-
-        return;
-
-    }
-
-
-    person.active =
-        !person.active;
-
-
-    savePeople();
-
-
-    renderPeople();
-
-}
-
-
-// ----------------------------------------
-// ESCAPE HTML
-// ----------------------------------------
-
-function escapeHTML(value) {
-
-    const div =
-        document.createElement("div");
-
-    div.textContent =
-        value ?? "";
-
-    return div.innerHTML;
-
-}
-
-
-// ----------------------------------------
-// ESCAPE ATTRIBUTE
-// ----------------------------------------
-
-function escapeAttribute(value) {
-
-    return String(value)
-        .replace(/\\/g, "\\\\")
-        .replace(/'/g, "\\'");
-}
-
-
-// ----------------------------------------
-// CLOSE MODAL WHEN CLICKING OUTSIDE
-// ----------------------------------------
-
-personModal.addEventListener(
-    "click",
-    function (event) {
-
-        if (
-            event.target ===
-            personModal
-        ) {
 
             closePersonModal();
 
+            await showMessage(
+                "Person added successfully.",
+                "success",
+                "Person Added"
+            );
+
+            await loadPeople();
+        } catch (error) {
+            console.error("Adding person failed:", error);
+
+            await showMessage(
+                error.message || "Unable to add person.",
+                "error",
+                "Save Failed"
+            );
+        } finally {
+            isSaving = false;
+
+            if (submitButton) {
+                submitButton.disabled = false;
+            }
         }
+    });
+}
 
-    }
-);
+// ========================================
+// ENABLE / DISABLE
+// ========================================
 
+async function togglePerson(username) {
+    await showMessage(
+        "Enable/disable functionality is not available in the current Cloudflare Worker API. No changes were made.",
+        "info",
+        "Feature Not Available"
+    );
+}
 
-// ----------------------------------------
+window.togglePerson = togglePerson;
+
+// ========================================
+// ESCAPE ATTRIBUTE
+// ========================================
+
+function escapeAttribute(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+// ========================================
+// CLOSE MODAL WHEN CLICKING OUTSIDE
+// ========================================
+
+if (personModal) {
+    personModal.addEventListener("click", function (event) {
+        if (event.target === personModal) {
+            closePersonModal();
+        }
+    });
+}
+
+// ========================================
 // INITIAL LOAD
-// ----------------------------------------
+// ========================================
 
-renderPeople();
+if (role === "admin" && token) {
+    loadPeople();
+}

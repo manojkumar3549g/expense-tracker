@@ -1,21 +1,24 @@
+
 // ========================================
 // PROFESSIONAL NOTIFICATION SYSTEM
 // ========================================
 
+// Track the currently open dialogs.
+let activeAlertClose = null;
+let activeConfirmClose = null;
+
+// ========================================
+// ALERT MODAL
+// ========================================
+
 function showAlert(message, type = "success", title = "") {
-
     return new Promise(function (resolve) {
-
-        // Remove existing modal
-        const existing =
-            document.getElementById("appAlertOverlay");
-
-        if (existing) {
-            existing.remove();
+        // Close an existing alert first.
+        if (typeof activeAlertClose === "function") {
+            activeAlertClose();
         }
 
-
-        // Default titles
+        // Default titles.
         const titles = {
             success: "Success",
             error: "Error",
@@ -23,8 +26,7 @@ function showAlert(message, type = "success", title = "") {
             info: "Information"
         };
 
-
-        // Icons
+        // Icons.
         const icons = {
             success: "✓",
             error: "!",
@@ -32,170 +34,100 @@ function showAlert(message, type = "success", title = "") {
             info: "i"
         };
 
+        const finalTitle = title || titles[type] || "Message";
+        const icon = icons[type] || "i";
 
-        const finalTitle =
-            title || titles[type] || "Message";
-
-        const icon =
-            icons[type] || "i";
-
-
-        // Create modal
-        const overlay =
-            document.createElement("div");
-
-        overlay.id =
-            "appAlertOverlay";
-
-        overlay.className =
-            "app-alert-overlay";
-
+        const overlay = document.createElement("div");
+        overlay.id = "appAlertOverlay";
+        overlay.className = "app-alert-overlay";
 
         overlay.innerHTML = `
-
             <div
                 class="app-alert-modal"
-                role="dialog"
+                role="alertdialog"
                 aria-modal="true"
+                aria-labelledby="appAlertTitle"
+                aria-describedby="appAlertMessage"
             >
-
                 <button
                     type="button"
                     class="app-alert-close"
                     id="appAlertClose"
                     aria-label="Close"
-                >
-                    ×
-                </button>
+                >×</button>
 
-
-                <div
-                    class="app-alert-icon ${type}"
-                >
+                <div class="app-alert-icon ${escapeNotificationHTML(type)}">
                     ${icon}
                 </div>
 
-
-                <h3>
-                    ${escapeNotificationHTML(
-                        finalTitle
-                    )}
+                <h3 id="appAlertTitle">
+                    ${escapeNotificationHTML(finalTitle)}
                 </h3>
 
-
-                <p>
-                    ${escapeNotificationHTML(
-                        message
-                    )}
+                <p id="appAlertMessage">
+                    ${escapeNotificationHTML(message)}
                 </p>
-
 
                 <button
                     type="button"
-                    class="app-alert-button ${type}"
+                    class="app-alert-button ${escapeNotificationHTML(type)}"
                     id="appAlertOk"
-                >
-                    OK
-                </button>
-
+                >OK</button>
             </div>
-
         `;
 
+        document.body.appendChild(overlay);
 
-        document.body.appendChild(
-            overlay
-        );
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
 
+        let finished = false;
 
-        // Prevent background scrolling
-        document.body.style.overflow =
-            "hidden";
+        function closeAlert() {
+            if (finished) return;
 
+            finished = true;
 
-        const closeAlert =
-            function () {
+            document.removeEventListener("keydown", escHandler);
 
+            if (overlay.isConnected) {
                 overlay.remove();
-
-                document.body.style.overflow =
-                    "";
-
-                resolve();
-
-            };
-
-
-        document
-            .getElementById("appAlertOk")
-            .addEventListener(
-                "click",
-                closeAlert
-            );
-
-
-        document
-            .getElementById("appAlertClose")
-            .addEventListener(
-                "click",
-                closeAlert
-            );
-
-
-        // Click outside
-        overlay.addEventListener(
-            "click",
-            function (event) {
-
-                if (
-                    event.target === overlay
-                ) {
-
-                    closeAlert();
-
-                }
-
-            }
-        );
-
-
-        // ESC key
-        document.addEventListener(
-            "keydown",
-            function escHandler(event) {
-
-                if (event.key === "Escape") {
-
-                    document.removeEventListener(
-                        "keydown",
-                        escHandler
-                    );
-
-                    closeAlert();
-
-                }
-
-            }
-        );
-
-
-        // Focus OK button
-        setTimeout(function () {
-
-            const okButton =
-                document.getElementById(
-                    "appAlertOk"
-                );
-
-            if (okButton) {
-                okButton.focus();
             }
 
-        }, 50);
+            document.body.style.overflow = previousOverflow;
 
+            if (activeAlertClose === closeAlert) {
+                activeAlertClose = null;
+            }
+
+            resolve();
+        }
+
+        function escHandler(event) {
+            if (event.key === "Escape") {
+                closeAlert();
+            }
+        }
+
+        activeAlertClose = closeAlert;
+
+        overlay.querySelector("#appAlertOk")
+            .addEventListener("click", closeAlert);
+
+        overlay.querySelector("#appAlertClose")
+            .addEventListener("click", closeAlert);
+
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) {
+                closeAlert();
+            }
+        });
+
+        document.addEventListener("keydown", escHandler);
+
+        overlay.querySelector("#appAlertOk").focus();
     });
 }
-
 
 // ========================================
 // CONFIRMATION MODAL
@@ -207,188 +139,138 @@ function showConfirm(
     confirmText = "Confirm",
     cancelText = "Cancel"
 ) {
-
     return new Promise(function (resolve) {
-
-        const existing =
-            document.getElementById(
-                "appConfirmOverlay"
-            );
-
-        if (existing) {
-            existing.remove();
+        // Close an existing confirmation first.
+        if (typeof activeConfirmClose === "function") {
+            activeConfirmClose(false);
         }
 
-
-        const overlay =
-            document.createElement("div");
-
-        overlay.id =
-            "appConfirmOverlay";
-
-        overlay.className =
-            "app-alert-overlay";
-
+        const overlay = document.createElement("div");
+        overlay.id = "appConfirmOverlay";
+        overlay.className = "app-alert-overlay";
 
         overlay.innerHTML = `
-
             <div
                 class="app-alert-modal"
-                role="dialog"
+                role="alertdialog"
                 aria-modal="true"
+                aria-labelledby="appConfirmTitle"
+                aria-describedby="appConfirmMessage"
             >
-
                 <button
                     type="button"
                     class="app-alert-close"
                     id="appConfirmClose"
-                >
-                    ×
-                </button>
+                    aria-label="Cancel"
+                >×</button>
 
+                <div class="app-alert-icon warning">?</div>
 
-                <div class="app-alert-icon warning">
-                    ?
-                </div>
-
-
-                <h3>
-                    ${escapeNotificationHTML(
-                        title
-                    )}
+                <h3 id="appConfirmTitle">
+                    ${escapeNotificationHTML(title)}
                 </h3>
 
-
-                <p>
-                    ${escapeNotificationHTML(
-                        message
-                    )}
+                <p id="appConfirmMessage">
+                    ${escapeNotificationHTML(message)}
                 </p>
 
-
                 <div class="app-confirm-buttons">
-
                     <button
                         type="button"
                         class="app-confirm-cancel"
                         id="appConfirmCancel"
                     >
-                        ${escapeNotificationHTML(
-                            cancelText
-                        )}
+                        ${escapeNotificationHTML(cancelText)}
                     </button>
-
 
                     <button
                         type="button"
                         class="app-confirm-ok"
                         id="appConfirmOk"
                     >
-                        ${escapeNotificationHTML(
-                            confirmText
-                        )}
+                        ${escapeNotificationHTML(confirmText)}
                     </button>
-
                 </div>
-
             </div>
-
         `;
 
+        document.body.appendChild(overlay);
 
-        document.body.appendChild(
-            overlay
-        );
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
 
-
-        document.body.style.overflow =
-            "hidden";
-
+        let finished = false;
 
         function finish(value) {
+            if (finished) return;
 
-            overlay.remove();
+            finished = true;
 
-            document.body.style.overflow =
-                "";
+            document.removeEventListener("keydown", escHandler);
+
+            if (overlay.isConnected) {
+                overlay.remove();
+            }
+
+            document.body.style.overflow = previousOverflow;
+
+            if (activeConfirmClose === finish) {
+                activeConfirmClose = null;
+            }
 
             resolve(value);
-
         }
 
-
-        document
-            .getElementById(
-                "appConfirmOk"
-            )
-            .addEventListener(
-                "click",
-                function () {
-
-                    finish(true);
-
-                }
-            );
-
-
-        document
-            .getElementById(
-                "appConfirmCancel"
-            )
-            .addEventListener(
-                "click",
-                function () {
-
-                    finish(false);
-
-                }
-            );
-
-
-        document
-            .getElementById(
-                "appConfirmClose"
-            )
-            .addEventListener(
-                "click",
-                function () {
-
-                    finish(false);
-
-                }
-            );
-
-
-        overlay.addEventListener(
-            "click",
-            function (event) {
-
-                if (
-                    event.target === overlay
-                ) {
-
-                    finish(false);
-
-                }
-
+        function escHandler(event) {
+            if (event.key === "Escape") {
+                finish(false);
             }
-        );
+        }
 
+        activeConfirmClose = finish;
+
+        overlay.querySelector("#appConfirmOk")
+            .addEventListener("click", function () {
+                finish(true);
+            });
+
+        overlay.querySelector("#appConfirmCancel")
+            .addEventListener("click", function () {
+                finish(false);
+            });
+
+        overlay.querySelector("#appConfirmClose")
+            .addEventListener("click", function () {
+                finish(false);
+            });
+
+        overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) {
+                finish(false);
+            }
+        });
+
+        document.addEventListener("keydown", escHandler);
+
+        overlay.querySelector("#appConfirmOk").focus();
     });
 }
-
 
 // ========================================
 // HTML ESCAPE
 // ========================================
 
 function escapeNotificationHTML(value) {
-
-    const div =
-        document.createElement("div");
-
-    div.textContent =
-        value ?? "";
-
+    const div = document.createElement("div");
+    div.textContent = value ?? "";
     return div.innerHTML;
 }
+
+// ========================================
+// GLOBAL ACCESS
+// ========================================
+
+// Keep these functions available to other JavaScript files.
+window.showAlert = showAlert;
+window.showConfirm = showConfirm;
+window.escapeNotificationHTML = escapeNotificationHTML;

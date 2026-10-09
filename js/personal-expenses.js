@@ -1,581 +1,408 @@
+const API_URL = "https://expense-tracker-api.manojkumar3549g.workers.dev";
+
 // ========================================
 // PERSONAL EXPENSES
 // ========================================
-
 
 // ========================================
 // LOGIN CHECK
 // ========================================
 
-const username =
-    localStorage.getItem("loggedInUser");
+const username = localStorage.getItem("loggedInUser");
+const role = localStorage.getItem("userRole");
+const personName = localStorage.getItem("personName");
+const authToken = localStorage.getItem("authToken");
 
-const role =
-    localStorage.getItem("userRole");
-
-const personName =
-    localStorage.getItem("personName");
-
-
-if (!username || role !== "person") {
-
-    window.location.href =
-        "../index.html";
-
+if (!username || role !== "person" || !authToken) {
+    window.location.href = "../index.html";
+} else {
+    initializePersonalExpenses();
 }
-
 
 // ========================================
 // PEOPLE
 // ========================================
 
 const people = {
-
     vetri: "Vetrivel",
-
     nitheen: "Nitheen",
-
     yash: "Yaswanth",
-
     dharshu: "Dharshini",
-
     mano: "ManojKumar"
-
 };
 
-
 // ========================================
-// DISPLAY NAME
-// ========================================
-
-document.getElementById(
-    "personName"
-).textContent =
-    personName ||
-    people[username] ||
-    username;
-
-
-// ========================================
-// LOAD EXPENSES
+// INITIALIZE PAGE
 // ========================================
 
-const expenses =
-    JSON.parse(
-        localStorage.getItem("expenses") || "[]"
-    );
+async function initializePersonalExpenses() {
+    const nameElement = document.getElementById("personName");
+    const expenseList = document.getElementById("expenseList");
 
+    if (nameElement) {
+        nameElement.textContent =
+            personName || getPersonName(username);
+    }
+
+    if (!expenseList) {
+        console.error("Expense list element was not found.");
+        return;
+    }
+
+    expenseList.innerHTML = "<p>Loading personal expenses...</p>";
+
+    try {
+        const data = await apiRequest("/api/expenses");
+
+        const expenses = Array.isArray(data)
+            ? data
+            : Array.isArray(data.expenses)
+                ? data.expenses
+                : [];
+
+        calculatePersonalExpenses(expenses);
+    } catch (error) {
+        console.error("Unable to load personal expenses:", error);
+
+        expenseList.innerHTML = `
+            <div class="empty-state">
+                <h3>Unable to load expenses</h3>
+                <p>${escapeHTML(error.message || "Please refresh and try again.")}</p>
+            </div>
+        `;
+    }
+}
 
 // ========================================
-// PERSONAL EXPENSES
+// API REQUEST
 // ========================================
 
-const myExpenses = [];
+async function apiRequest(endpoint) {
+    const token = localStorage.getItem("authToken");
 
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        method: "GET",
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        }
+    });
 
-let mySpent = 0;
+    let data = {};
 
-let myGiven = 0;
+    try {
+        data = await response.json();
+    } catch {
+        data = {};
+    }
 
+    if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("loggedInUser");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("personName");
 
-expenses.forEach(
-    function (expense) {
+        window.location.href = "../index.html";
 
+        throw new Error("Your session has expired. Please log in again.");
+    }
 
-        let myAmount = 0;
+    if (!response.ok) {
+        throw new Error(data.error || "Unable to load expenses.");
+    }
 
+    return data;
+}
 
-        // Amount given by this person
+// ========================================
+// CALCULATE PERSONAL EXPENSES
+// ========================================
 
-        if (
-            expense.split &&
-            expense.split[username] !== undefined
-        ) {
+function calculatePersonalExpenses(expenses) {
+    const myExpenses = [];
 
-            myAmount =
-                Number(
-                    expense.split[username]
-                ) || 0;
+    let mySpent = 0;
+    let myGiven = 0;
 
+    expenses.forEach(function (expense) {
+        const splitAmounts = expense.splits || expense.split || {};
+
+        const myAmount = Number(splitAmounts[username]) || 0;
+        const spentByMe = expense.spentBy === username;
+
+        // Total amount paid by this person
+        if (spentByMe) {
+            mySpent += Number(expense.totalAmount) || 0;
         }
 
-
-        // Amount actually spent
-
-        if (
-            expense.spentBy === username
-        ) {
-
-            mySpent +=
-                Number(
-                    expense.totalAmount
-                ) || 0;
-
-        }
-
-
-        // Add if person participated
-
-        if (
-            myAmount > 0 ||
-            expense.spentBy === username
-        ) {
-
+        // Include expenses in which this person participated
+        if (myAmount > 0 || spentByMe) {
             myGiven += myAmount;
 
-
             myExpenses.push({
-
                 ...expense,
-
-                myGiven:
-                    myAmount
-
+                myGiven: myAmount
             });
-
         }
+    });
 
+    const mySpentElement = document.getElementById("mySpent");
+    const myGivenElement = document.getElementById("myGiven");
+
+    // Support either ID if the HTML uses a different count element
+    const countElement =
+        document.getElementById("myExpenseCount") ||
+        document.getElementById("expenseCount");
+
+    const statusElement =
+        document.getElementById("transactionStatus");
+
+    if (mySpentElement) {
+        mySpentElement.textContent = formatCurrency(mySpent);
     }
-);
 
+    if (myGivenElement) {
+        myGivenElement.textContent = formatCurrency(myGiven);
+    }
 
-// ========================================
-// SUMMARY
-// ========================================
+    if (countElement) {
+        countElement.textContent = myExpenses.length;
+    }
 
-document.getElementById(
-    "mySpent"
-).textContent =
-    formatCurrency(mySpent);
+    if (statusElement) {
+        statusElement.textContent =
+            myExpenses.length +
+            (myExpenses.length === 1
+                ? " transaction"
+                : " transactions");
+    }
 
-
-document.getElementById(
-    "myGiven"
-).textContent =
-    formatCurrency(myGiven);
-
-
-document.getElementById(
-    "myExpenseCount"
-).textContent =
-    myExpenses.length;
-
-
-document.getElementById(
-    "transactionStatus"
-).textContent =
-
-    myExpenses.length === 1
-
-        ? "1 transaction"
-
-        : `${myExpenses.length} transactions`;
-
+    displayPersonalExpenses(myExpenses);
+}
 
 // ========================================
-// DISPLAY EXPENSES
+// DISPLAY PERSONAL EXPENSES
 // ========================================
 
-const expenseList =
-    document.getElementById(
-        "expenseList"
-    );
+function displayPersonalExpenses(myExpenses) {
+    const expenseList = document.getElementById("expenseList");
 
+    if (!expenseList) {
+        return;
+    }
 
-if (myExpenses.length === 0) {
+    expenseList.innerHTML = "";
 
-
-    expenseList.innerHTML = `
-
-        <div class="empty-state">
-
-            <div>
-                🧾
+    if (myExpenses.length === 0) {
+        expenseList.innerHTML = `
+            <div class="empty-state">
+                <div>🧾</div>
+                <h3>No personal expenses yet</h3>
+                <p>Expenses in which you participate will appear here.</p>
             </div>
-
-            <h3>
-                No personal expenses yet
-            </h3>
-
-            <p>
-                Expenses in which you participate
-                will appear here.
-            </p>
-
-        </div>
-
-    `;
-
-
-} else {
-
+        `;
+        return;
+    }
 
     myExpenses
         .slice()
-        .sort(
-            function (a, b) {
+        .sort(function (a, b) {
+            return new Date(b.date || 0) - new Date(a.date || 0);
+        })
+        .forEach(function (expense) {
+            const card = document.createElement("div");
+            card.className = "expense-card";
 
-                return (
-                    new Date(b.date) -
-                    new Date(a.date)
-                );
+            const spentByMe = expense.spentBy === username;
+            const spentBy = getPersonName(expense.spentBy);
 
-            }
-        )
-        .forEach(
-            function (expense) {
+            const expenseName = escapeHTML(expense.name || "Expense");
+            const category = escapeHTML(expense.category || "Others");
+            const details = expense.details
+                ? escapeHTML(expense.details)
+                : "";
 
-                const card =
-                    document.createElement(
-                        "div"
-                    );
+            const expenseId = expense.id;
 
+            card.innerHTML = `
+                <div class="expense-top">
+                    <div class="expense-title">
+                        <div class="expense-icon">
+                            ${getCategoryIcon(expense.category)}
+                        </div>
 
-                card.className =
-                    "expense-card";
+                        <div>
+                            <h3>${expenseName}</h3>
+                            <p>
+                                ${category}
+                                •
+                                ${formatDate(expense.date)}
+                            </p>
+                        </div>
+                    </div>
 
+                    <div class="expense-total">
+                        <span>Total Expense</span>
+                        <strong>
+                            ${formatCurrency(expense.totalAmount)}
+                        </strong>
+                    </div>
+                </div>
 
-                const spentBy =
-                    people[
-                        expense.spentBy
-                    ] ||
-                    expense.spentBy ||
-                    "-";
+                <div class="expense-details">
+                    <div class="detail-box">
+                        <span>Spent By</span>
+                        <strong>
+                            ${escapeHTML(spentBy)}
+                            ${spentByMe ? " (You)" : ""}
+                        </strong>
+                    </div>
 
+                    <div class="detail-box">
+                        <span>My Given</span>
+                        <strong>
+                            ${formatCurrency(expense.myGiven)}
+                        </strong>
+                    </div>
 
-                const spentByMe =
-                    expense.spentBy ===
-                    username;
+                    <div class="detail-box">
+                        <span>Date</span>
+                        <strong>
+                            ${formatDate(expense.date)}
+                        </strong>
+                    </div>
+                </div>
 
-
-                card.innerHTML = `
-
-                    <div class="expense-top">
-
-
-                        <div class="expense-title">
-
-                            <div class="expense-icon">
-
-                                ${getCategoryIcon(
-                                    expense.category
-                                )}
-
+                ${
+                    details
+                        ? `
+                            <div class="additional-details">
+                                <strong>Details:</strong>
+                                ${details}
                             </div>
-
-
-                            <div>
-
-                                <h3>
-
-                                    ${escapeHTML(
-                                        expense.name
-                                    )}
-
-                                </h3>
-
-
-                                <p>
-
-                                    ${escapeHTML(
-                                        expense.category
-                                    )}
-
-                                    •
-
-                                    ${formatDate(
-                                        expense.date
-                                    )}
-
-                                </p>
-
-                            </div>
-
-                        </div>
-
-
-                        <div class="expense-total">
-
-                            <span>
-                                Total Expense
-                            </span>
-
-                            <strong>
-
-                                ${formatCurrency(
-                                    expense.totalAmount
-                                )}
-
-                            </strong>
-
-                        </div>
-
-
-                    </div>
-
-
-
-                    <div class="expense-details">
-
-
-                        <div class="detail-box">
-
-                            <span>
-                                Spent By
-                            </span>
-
-                            <strong>
-
-                                ${escapeHTML(
-                                    spentBy
-                                )}
-
-                                ${
-                                    spentByMe
-                                        ? " (You)"
-                                        : ""
-                                }
-
-                            </strong>
-
-                        </div>
-
-
-                        <div class="detail-box">
-
-                            <span>
-                                My Given
-                            </span>
-
-                            <strong>
-
-                                ${formatCurrency(
-                                    expense.myGiven
-                                )}
-
-                            </strong>
-
-                        </div>
-
-
-                        <div class="detail-box">
-
-                            <span>
-                                Date
-                            </span>
-
-                            <strong>
-
-                                ${formatDate(
-                                    expense.date
-                                )}
-
-                            </strong>
-
-                        </div>
-
-
-                    </div>
-
-
-                    ${
-                        expense.details
-                            ? `
-
-                        <div class="additional-details">
-
-                            <strong>
-                                Details:
-                            </strong>
-
-                            ${escapeHTML(
-                                expense.details
-                            )}
-
-                        </div>
-
-                    `
-                            : ""
-                    }
-
-
-                    <div class="expense-actions">
-
-                        <a
-                            class="request-btn"
-                            href="request-change.html?expense=${encodeURIComponent(
-                                expense.id
-                            )}"
-                        >
-
-                            📝 Request a Change
-
-                        </a>
-
-                    </div>
-
-                `;
-
-
-                expenseList.appendChild(
-                    card
-                );
-
-            }
-        );
-
+                        `
+                        : ""
+                }
+
+                <div class="expense-actions">
+                    <a
+                        class="request-btn"
+                        href="request-change.html?expense=${encodeURIComponent(
+                            expenseId ?? ""
+                        )}"
+                    >
+                        📝 Request a Change
+                    </a>
+                </div>
+            `;
+
+            expenseList.appendChild(card);
+        });
 }
 
+// ========================================
+// GET PERSON NAME
+// ========================================
+
+function getPersonName(personUsername) {
+    return people[personUsername] || personUsername || "-";
+}
 
 // ========================================
 // CATEGORY ICON
 // ========================================
 
 function getCategoryIcon(category) {
-
     const icons = {
-
         Bus: "🚌",
-
         Auto: "🛺",
-
         Theatre: "🎭",
-
         Lunch: "🍛",
-
         Dinner: "🍽️",
-
         Snacks: "🍿",
-
         Petrol: "⛽",
-
         Movie: "🎬",
-
         Others: "📌"
-
     };
 
-
-    return (
-        icons[category] ||
-        "🧾"
-    );
-
+    return icons[category] || "🧾";
 }
-
 
 // ========================================
 // CURRENCY
 // ========================================
 
 function formatCurrency(amount) {
-
-    return Number(
-        amount || 0
-    ).toLocaleString(
-        "en-IN",
-        {
-            style: "currency",
-            currency: "INR",
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }
-    );
-
+    return Number(amount || 0).toLocaleString("en-IN", {
+        style: "currency",
+        currency: "INR",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 }
-
 
 // ========================================
 // DATE
 // ========================================
 
 function formatDate(date) {
-
     if (!date) {
-
         return "-";
-
     }
 
+    const dateString = String(date);
 
-    const parts =
-        date.split("-");
+    // Handle YYYY-MM-DD dates without timezone shifting
+    const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
 
-
-    if (parts.length !== 3) {
-
-        return date;
-
+    if (match) {
+        return `${match[3]}-${match[2]}-${match[1]}`;
     }
 
+    const parsedDate = new Date(dateString);
 
-    return (
-        `${parts[2]}-${parts[1]}-${parts[0]}`
-    );
+    if (Number.isNaN(parsedDate.getTime())) {
+        return "-";
+    }
 
+    return parsedDate.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+    });
 }
-
 
 // ========================================
 // ESCAPE HTML
 // ========================================
 
 function escapeHTML(value) {
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-    div.textContent =
-        value ?? "";
-
+    const div = document.createElement("div");
+    div.textContent = value ?? "";
     return div.innerHTML;
-
 }
 
 // ========================================
 // BACK BUTTON
 // ========================================
 
-const backBtn =
-    document.getElementById("backBtn");
+const backBtn = document.getElementById("backBtn");
 
 if (backBtn) {
-
-    backBtn.addEventListener(
-        "click",
-        function () {
-
-            window.location.href =
-                "person-dashboard.html";
-
-        }
-    );
-
+    backBtn.addEventListener("click", function () {
+        window.location.href = "person-dashboard.html";
+    });
 }
-
 
 // ========================================
 // LOGOUT
 // ========================================
 
 function logout() {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("loggedInUser");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("personName");
 
-    localStorage.removeItem(
-        "loggedInUser"
-    );
-
-    localStorage.removeItem(
-        "userRole"
-    );
-
-    localStorage.removeItem(
-        "personName"
-    );
-
-
-    window.location.href =
-        "../index.html";
-
+    window.location.href = "../index.html";
 }
