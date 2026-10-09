@@ -1,4 +1,6 @@
 
+"use strict";
+
 // ========================================
 // PEOPLE MANAGEMENT
 // ========================================
@@ -69,23 +71,25 @@ async function confirmAction(message) {
     return window.confirm(message);
 }
 
+// ========================================
+// API REQUEST
+// ========================================
+
 async function apiRequest(path, options = {}) {
     const response = await fetch(`${API_URL}${path}`, {
         ...options,
         headers: {
-            Authorization: `Bearer ${token}`,
-            ...(options.body ? { "Content-Type": "application/json" } : {}),
+            Authorization: `Bearer ${localStorage.getItem("authToken") || ""}`,
+            ...(options.body
+                ? { "Content-Type": "application/json" }
+                : {}),
             ...(options.headers || {})
         }
     });
 
     const data = await response.json().catch(() => ({}));
 
-    if (response.status === 401 || response.status === 403) {
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
+    if (response.status === 401) {
         localStorage.removeItem("authToken");
         localStorage.removeItem("loggedInUser");
         localStorage.removeItem("userRole");
@@ -103,7 +107,7 @@ async function apiRequest(path, options = {}) {
 }
 
 // ========================================
-// LOAD PEOPLE FROM CLOUDFLARE
+// LOAD ACCOUNTS FROM CLOUDFLARE
 // ========================================
 
 async function loadPeople() {
@@ -111,31 +115,51 @@ async function loadPeople() {
 
     peopleGrid.innerHTML = `
         <div class="empty-state">
-            <h3>Loading people...</h3>
+            <h3>Loading accounts...</h3>
         </div>
     `;
 
     try {
         const data = await apiRequest("/api/people");
 
-        people = (Array.isArray(data) ? data : data.people || [])
-            .map(function (person) {
-                return {
-                    name: person.name || person.username,
-                    username: person.username,
-                    role: person.role || "person",
-                    active: person.enabled === true ||
-                            person.enabled === 1
-                };
-            });
+        const personAccounts = (
+            Array.isArray(data) ? data : data.people || []
+        ).map(function (person) {
+            return {
+                name: person.name || person.username,
+                username: person.username,
+                role: person.role || "person",
+                active: person.enabled === true || person.enabled === 1
+            };
+        });
 
+        // Add the current admin account to the management screen.
+        // The current GET /api/people endpoint returns person accounts only.
+        const adminUsername = (
+            localStorage.getItem("loggedInUser") || ""
+        ).trim().toLowerCase();
+
+        if (
+            adminUsername &&
+            !personAccounts.some(p => p.username === adminUsername)
+        ) {
+            personAccounts.push({
+                name: localStorage.getItem("personName") || "Admin",
+                username: adminUsername,
+                role: "admin",
+                active: true
+            });
+        }
+
+        people = personAccounts;
         renderPeople();
+
     } catch (error) {
-        console.error("Loading people failed:", error);
+        console.error("Loading accounts failed:", error);
 
         peopleGrid.innerHTML = `
             <div class="empty-state">
-                <h3>Unable to load people</h3>
+                <h3>Unable to load accounts</h3>
                 <p>${escapeHTML(error.message)}</p>
                 <button type="button" id="retryPeopleBtn">
                     Try Again
@@ -152,7 +176,7 @@ async function loadPeople() {
 }
 
 // ========================================
-// RENDER PEOPLE
+// RENDER ACCOUNTS
 // ========================================
 
 function renderPeople() {
@@ -162,13 +186,13 @@ function renderPeople() {
 
     if (peopleCountText) {
         peopleCountText.textContent =
-            `${people.length} ${people.length === 1 ? "person" : "people"}`;
+            `${people.length} ${people.length === 1 ? "account" : "accounts"}`;
     }
 
     if (people.length === 0) {
         peopleGrid.innerHTML = `
             <div class="empty-state">
-                <h3>No people found</h3>
+                <h3>No accounts found</h3>
                 <p>Add a person to get started.</p>
             </div>
         `;
@@ -181,7 +205,7 @@ function renderPeople() {
 }
 
 // ========================================
-// PERSON CARD
+// ACCOUNT CARD
 // ========================================
 
 function createPersonCard(person) {
@@ -190,17 +214,18 @@ function createPersonCard(person) {
 
     const statusClass = person.active ? "active" : "inactive";
     const statusText = person.active ? "Active" : "Inactive";
+    const isAdmin = person.role === "admin";
+    const roleLabel = isAdmin ? "Admin" : "Person";
 
     card.innerHTML = `
         <div class="person-top">
-            <div class="person-avatar">👤</div>
+            <div class="person-avatar">${isAdmin ? "🛡️" : "👤"}</div>
 
             <div>
                 <h2 class="person-name">
                     ${escapeHTML(person.name)}
                 </h2>
-
-                <div class="person-role">Person</div>
+                <div class="person-role">${roleLabel}</div>
             </div>
         </div>
 
@@ -214,7 +239,7 @@ function createPersonCard(person) {
 
             <div class="detail-row">
                 <span class="detail-label">Role</span>
-                <span class="detail-value">Person</span>
+                <span class="detail-value">${roleLabel}</span>
             </div>
 
             <div class="detail-row">
@@ -235,14 +260,16 @@ function createPersonCard(person) {
                 data-username="${escapeHTML(person.username)}"
             >✏️ Edit</button>
 
-            <button
-                type="button"
-                class="person-action-btn toggle-person"
-                data-action="toggle"
-                data-username="${escapeHTML(person.username)}"
-                disabled
-                title="Account enable/disable API is not available yet"
-            >${person.active ? "🔒 Disable" : "🔓 Enable"}</button>
+            
+<button
+    type="button"
+    class="person-action-btn toggle-person"
+    data-action="toggle"
+    data-username="${escapeHTML(person.username)}"
+>
+    ${person.active ? "Disable Account" : "Enable Account"}
+</button>
+
         </div>
     `;
 
@@ -287,9 +314,11 @@ function openAddPersonModal() {
 
     if (personUsername) {
         personUsername.disabled = false;
+        personUsername.required = true;
     }
 
     if (personPassword) {
+        personPassword.disabled = false;
         personPassword.required = true;
         personPassword.value = "";
         personPassword.minLength = 8;
@@ -304,7 +333,7 @@ function openAddPersonModal() {
 window.openAddPersonModal = openAddPersonModal;
 
 // ========================================
-// EDIT PERSON
+// EDIT ACCOUNT
 // ========================================
 
 function editPerson(username) {
@@ -313,14 +342,15 @@ function editPerson(username) {
     });
 
     if (!person) {
-        showMessage("Person not found.", "error", "Not Found");
+        showMessage("Account not found.", "error", "Not Found");
         return;
     }
 
     editingUsername = username;
 
     if (modalTitle) {
-        modalTitle.textContent = "Edit Person";
+        modalTitle.textContent =
+            person.role === "admin" ? "Edit Admin Account" : "Edit Person";
     }
 
     if (personName) {
@@ -329,26 +359,22 @@ function editPerson(username) {
 
     if (personUsername) {
         personUsername.value = person.username;
-        personUsername.disabled = true;
+        personUsername.disabled = false;
+        personUsername.required = true;
     }
 
     if (personPassword) {
         personPassword.value = "";
+        personPassword.disabled = false;
         personPassword.required = false;
+        personPassword.minLength = 8;
         personPassword.placeholder =
-            "Editing is not available through the current API";
-        personPassword.disabled = true;
+            "Leave blank to keep the current password";
     }
 
     if (personModal) {
         personModal.classList.add("show");
     }
-
-    showMessage(
-        "The current API supports adding people, but does not support editing existing accounts yet.",
-        "info",
-        "Editing Unavailable"
-    );
 }
 
 window.editPerson = editPerson;
@@ -370,11 +396,13 @@ function closePersonModal() {
 
     if (personUsername) {
         personUsername.disabled = false;
+        personUsername.required = true;
     }
 
     if (personPassword) {
         personPassword.disabled = false;
         personPassword.required = true;
+        personPassword.minLength = 8;
         personPassword.placeholder = "At least 8 characters";
     }
 }
@@ -382,7 +410,7 @@ function closePersonModal() {
 window.closePersonModal = closePersonModal;
 
 // ========================================
-// SUBMIT FORM - ADD PERSON
+// SUBMIT FORM - ADD OR EDIT ACCOUNT
 // ========================================
 
 if (personForm) {
@@ -395,18 +423,9 @@ if (personForm) {
         const username = personUsername.value.trim().toLowerCase();
         const password = personPassword.value;
 
-        if (editingUsername) {
+        if (!name || !username) {
             await showMessage(
-                "Editing existing accounts is not supported by the current API. No changes were saved.",
-                "warning",
-                "Editing Unavailable"
-            );
-            return;
-        }
-
-        if (!name || !username || !password) {
-            await showMessage(
-                "Please enter the person's name, username and password.",
+                "Please enter the name and username.",
                 "warning",
                 "Missing Information"
             );
@@ -422,7 +441,7 @@ if (personForm) {
             return;
         }
 
-        if (password.length < 8) {
+        if (password && password.length < 8) {
             await showMessage(
                 "Password must be at least 8 characters long.",
                 "warning",
@@ -432,7 +451,10 @@ if (personForm) {
         }
 
         const duplicate = people.some(function (person) {
-            return person.username.toLowerCase() === username;
+            return (
+                person.username.toLowerCase() === username &&
+                person.username !== editingUsername
+            );
         });
 
         if (duplicate) {
@@ -444,6 +466,25 @@ if (personForm) {
             return;
         }
 
+        if (!editingUsername && !password) {
+            await showMessage(
+                "Enter a password of at least 8 characters.",
+                "warning",
+                "Password Required"
+            );
+            return;
+        }
+
+        const isEditing = Boolean(editingUsername);
+
+        const confirmed = await confirmAction(
+            isEditing
+                ? "Save these account changes?"
+                : "Add this new person?"
+        );
+
+        if (!confirmed) return;
+
         isSaving = true;
 
         const submitButton =
@@ -454,32 +495,81 @@ if (personForm) {
         }
 
         try {
-            await apiRequest("/api/people", {
-                method: "POST",
-                body: JSON.stringify({
+            if (isEditing) {
+                const oldUsername = editingUsername;
+                const payload = {
                     name: name,
-                    username: username,
-                    password: password
-                })
-            });
+                    username: username
+                };
 
-            closePersonModal();
+                // A blank password means keep the existing password.
+                if (password) {
+                    payload.password = password;
+                }
 
-            await showMessage(
-                "Person added successfully.",
-                "success",
-                "Person Added"
-            );
+                await apiRequest(
+                    "/api/people/" + encodeURIComponent(oldUsername),
+                    {
+                        method: "PUT",
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                // The current token contains the old username.
+                // Log in again after changing the current admin username.
+                if (
+                    oldUsername ===
+                        (localStorage.getItem("loggedInUser") || "")
+                            .trim().toLowerCase() &&
+                    username !== oldUsername
+                ) {
+                    localStorage.removeItem("authToken");
+                    localStorage.removeItem("loggedInUser");
+                    localStorage.removeItem("userRole");
+                    localStorage.removeItem("personName");
+
+                    window.location.href = "../index.html";
+                    return;
+                }
+
+                closePersonModal();
+
+                await showMessage(
+                    "Account updated successfully.",
+                    "success",
+                    "Changes Saved"
+                );
+
+            } else {
+                await apiRequest("/api/people", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        name: name,
+                        username: username,
+                        password: password
+                    })
+                });
+
+                closePersonModal();
+
+                await showMessage(
+                    "Person added successfully.",
+                    "success",
+                    "Person Added"
+                );
+            }
 
             await loadPeople();
+
         } catch (error) {
-            console.error("Adding person failed:", error);
+            console.error("Saving account failed:", error);
 
             await showMessage(
-                error.message || "Unable to add person.",
+                error.message || "Unable to save account changes.",
                 "error",
                 "Save Failed"
             );
+
         } finally {
             isSaving = false;
 
@@ -494,15 +584,66 @@ if (personForm) {
 // ENABLE / DISABLE
 // ========================================
 
+
 async function togglePerson(username) {
-    await showMessage(
-        "Enable/disable functionality is not available in the current Cloudflare Worker API. No changes were made.",
-        "info",
-        "Feature Not Available"
+    const person = people.find(p => p.username === username);
+
+    if (!person) {
+        await showMessage("Account not found.", "error", "Error");
+        return;
+    }
+
+    if (person.role === "admin") {
+        await showMessage(
+            "The admin account cannot be disabled.",
+            "warning",
+            "Action Not Allowed"
+        );
+        return;
+    }
+
+    const newEnabled = !person.active;
+
+    const confirmed = await confirmAction(
+        newEnabled
+            ? `Enable ${person.name}'s account?`
+            : `Disable ${person.name}'s account?`
     );
+
+    if (!confirmed) return;
+
+    try {
+        await apiRequest(
+            `/api/people/${encodeURIComponent(username)}/status`,
+            {
+                method: "PATCH",
+                body: JSON.stringify({ enabled: newEnabled })
+            }
+        );
+
+        await showMessage(
+            newEnabled
+                ? "Account enabled successfully."
+                : "Account disabled successfully.",
+            "success",
+            "Account Updated"
+        );
+
+        await loadPeople();
+
+    } catch (error) {
+        console.error("Updating account status failed:", error);
+
+        await showMessage(
+            error.message || "Unable to update account status.",
+            "error",
+            "Update Failed"
+        );
+    }
 }
 
 window.togglePerson = togglePerson;
+
 
 // ========================================
 // ESCAPE ATTRIBUTE

@@ -193,35 +193,11 @@
                             Spent By
                         </label>
 
-                        <select
-                            id="spentBy"
-                            required>
+                        
+<select id="spentBy" required>
+    <option value="">Loading people...</option>
+</select>
 
-                            <option value="">
-                                Select person
-                            </option>
-
-                            <option value="vetri">
-                                Vetrivel
-                            </option>
-
-                            <option value="nitheen">
-                                Nitheen
-                            </option>
-
-                            <option value="yash">
-                                Yaswanth
-                            </option>
-
-                            <option value="dharshu">
-                                Dharshini
-                            </option>
-
-                            <option value="mano">
-                                ManojKumar
-                            </option>
-
-                        </select>
 
                     </div>
 
@@ -281,194 +257,11 @@
                 </div>
 
 
-                <!-- Vetrivel -->
-
-                <div class="person-row">
-
-                    <div class="person-check">
-
-                        <input
-                            type="checkbox"
-                            class="person-checkbox"
-                            id="vetriCheck"
-                            value="vetri">
-
-                        <label for="vetriCheck">
-                            Vetrivel
-                        </label>
-
-                    </div>
-
-
-                    <div class="person-amount-input">
-
-                        <span>₹</span>
-
-                        <input
-                            type="number"
-                            class="given-amount"
-                            id="vetriAmount"
-                            data-person="vetri"
-                            min="0"
-                            step="0.01"
-                            value="0"
-                            disabled>
-
-                    </div>
-
-                </div>
-
-
-                <!-- Nitheen -->
-
-                <div class="person-row">
-
-                    <div class="person-check">
-
-                        <input
-                            type="checkbox"
-                            class="person-checkbox"
-                            id="nitheenCheck"
-                            value="nitheen">
-
-                        <label for="nitheenCheck">
-                            Nitheen
-                        </label>
-
-                    </div>
-
-
-                    <div class="person-amount-input">
-
-                        <span>₹</span>
-
-                        <input
-                            type="number"
-                            class="given-amount"
-                            id="nitheenAmount"
-                            data-person="nitheen"
-                            min="0"
-                            step="0.01"
-                            value="0"
-                            disabled>
-
-                    </div>
-
-                </div>
-
-
-                <!-- Yaswanth -->
-
-                <div class="person-row">
-
-                    <div class="person-check">
-
-                        <input
-                            type="checkbox"
-                            class="person-checkbox"
-                            id="yashCheck"
-                            value="yash">
-
-                        <label for="yashCheck">
-                            Yaswanth
-                        </label>
-
-                    </div>
-
-
-                    <div class="person-amount-input">
-
-                        <span>₹</span>
-
-                        <input
-                            type="number"
-                            class="given-amount"
-                            id="yashAmount"
-                            data-person="yash"
-                            min="0"
-                            step="0.01"
-                            value="0"
-                            disabled>
-
-                    </div>
-
-                </div>
-
-
-                <!-- Dharshini -->
-
-                <div class="person-row">
-
-                    <div class="person-check">
-
-                        <input
-                            type="checkbox"
-                            class="person-checkbox"
-                            id="dharshuCheck"
-                            value="dharshu">
-
-                        <label for="dharshuCheck">
-                            Dharshini
-                        </label>
-
-                    </div>
-
-
-                    <div class="person-amount-input">
-
-                        <span>₹</span>
-
-                        <input
-                            type="number"
-                            class="given-amount"
-                            id="dharshuAmount"
-                            data-person="dharshu"
-                            min="0"
-                            step="0.01"
-                            value="0"
-                            disabled>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ManojKumar -->
-
-                <div class="person-row">
-
-                    <div class="person-check">
-
-                        <input
-                            type="checkbox"
-                            class="person-checkbox"
-                            id="manoCheck"
-                            value="mano">
-
-                        <label for="manoCheck">
-                            ManojKumar
-                        </label>
-
-                    </div>
-
-
-                    <div class="person-amount-input">
-
-                        <span>₹</span>
-
-                        <input
-                            type="number"
-                            class="given-amount"
-                            id="manoAmount"
-                            data-person="mano"
-                            min="0"
-                            step="0.01"
-                            value="0"
-                            disabled>
-
-                    </div>
-
-                </div>
+                
+<!-- People are loaded dynamically from the Cloudflare API -->
+<div id="splitPeopleContainer">
+    <p class="section-description">Loading people...</p>
+</div>
 
 
                 <!-- Amount Summary -->

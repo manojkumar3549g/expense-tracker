@@ -1,3 +1,6 @@
+
+"use strict";
+
 // ========================================
 // ADD / EDIT EXPENSE
 // ========================================
@@ -5,13 +8,10 @@
 const API_URL =
     "https://expense-tracker-api.manojkumar3549g.workers.dev";
 
-// ========================================
-// ADMIN ACCESS
-// ========================================
-
 const role = localStorage.getItem("userRole");
+const token = localStorage.getItem("authToken");
 
-if (role !== "admin") {
+if (role !== "admin" || !token) {
     window.location.href = "../index.html";
 }
 
@@ -26,30 +26,28 @@ const displayDifference = document.getElementById("displayDifference");
 const amountMessage = document.getElementById("amountMessage");
 const expenseForm = document.getElementById("expenseForm");
 const togglePeopleBtn = document.getElementById("togglePeopleBtn");
-
-const checkboxes = document.querySelectorAll(".person-checkbox");
-const amountInputs = document.querySelectorAll(".given-amount");
+const spentBySelect = document.getElementById("spentBy");
+const splitPeopleContainer =
+    document.getElementById("splitPeopleContainer");
 
 const pageTitle = document.querySelector("h1");
-const pageDescription = document.querySelector(".welcome-section p");
+const pageDescription = document.querySelector(".page-title p");
 
 const submitButton = expenseForm
     ? expenseForm.querySelector('button[type="submit"]')
     : null;
 
-// ========================================
-// EDIT MODE
-// ========================================
-
 const urlParams = new URLSearchParams(window.location.search);
 
-let editExpenseId = urlParams.get("edit");
-
-if (!editExpenseId) {
-    editExpenseId = localStorage.getItem("editExpenseId");
-}
+let editExpenseId =
+    urlParams.get("edit") || localStorage.getItem("editExpenseId");
 
 const isEditMode = Boolean(editExpenseId);
+
+let people = [];
+let checkboxes = [];
+let amountInputs = [];
+let isSaving = false;
 
 // ========================================
 // HELPERS
@@ -59,10 +57,10 @@ function getToken() {
     return localStorage.getItem("authToken");
 }
 
-function getPersonInput(person) {
-    return document.querySelector(
-        `.given-amount[data-person="${person}"]`
-    );
+function getPersonInput(username) {
+    return Array.from(
+        document.querySelectorAll(".given-amount")
+    ).find(input => input.dataset.person === username) || null;
 }
 
 function formatCurrency(amount) {
@@ -72,6 +70,12 @@ function formatCurrency(amount) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
+}
+
+function escapeHTML(value) {
+    const element = document.createElement("div");
+    element.textContent = value ?? "";
+    return element.innerHTML;
 }
 
 async function showMessageBox(message, type, title) {
@@ -93,31 +97,220 @@ function displayFormMessage(message, type) {
     }
 }
 
-// ========================================
-// INITIAL PEOPLE STATE
-// ========================================
+async function apiRequest(path, options = {}) {
+    const response = await fetch(`${API_URL}${path}`, {
+        ...options,
+        headers: {
+            ...(options.body ? {
+                "Content-Type": "application/json"
+            } : {}),
+            Authorization: `Bearer ${getToken() || ""}`,
+            ...(options.headers || {})
+        }
+    });
 
-checkboxes.forEach(function (checkbox) {
-    checkbox.checked = true;
+    const data = await response.json().catch(() => ({}));
 
-    const input = getPersonInput(checkbox.value);
+    if (response.status === 401) {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("loggedInUser");
+        localStorage.removeItem("userRole");
+        localStorage.removeItem("personName");
 
-    if (input) {
-        input.disabled = false;
+        window.location.href = "../index.html";
+        throw new Error("Session expired. Please log in again.");
     }
-});
+
+    if (!response.ok) {
+        throw new Error(data.error || "Request failed.");
+    }
+
+    return data;
+}
 
 // ========================================
-// AUTOMATIC SPLIT
+// LOAD ACTIVE PEOPLE DYNAMICALLY
 // ========================================
+
+async function loadPeople() {
+    if (spentBySelect) {
+        spentBySelect.innerHTML =
+            '<option value="">Loading people...</option>';
+    }
+
+    if (splitPeopleContainer) {
+        splitPeopleContainer.innerHTML =
+            '<p class="section-description">Loading people...</p>';
+    }
+
+    const response = await apiRequest("/api/people");
+
+    const accounts = Array.isArray(response)
+        ? response
+        : response.people || [];
+
+    people = accounts.filter(function (person) {
+        return (
+            person.username &&
+            person.role !== "admin" &&
+            (person.enabled === true ||
+             person.enabled === 1 ||
+             person.enabled === "1")
+        );
+    });
+
+    // Populate Spent By.
+    if (spentBySelect) {
+        spentBySelect.innerHTML =
+            '<option value="">Select person</option>';
+
+        people.forEach(function (person) {
+            const option = document.createElement("option");
+            option.value = person.username;
+            option.textContent = person.name || person.username;
+            spentBySelect.appendChild(option);
+        });
+    }
+
+    // Populate Split With.
+    if (splitPeopleContainer) {
+        splitPeopleContainer.innerHTML = "";
+
+        if (people.length === 0) {
+            splitPeopleContainer.innerHTML = `
+                <p class="section-description">
+                    No active people found. Add or enable an account first.
+                </p>
+            `;
+        } else {
+            people.forEach(function (person, index) {
+                const row = document.createElement("div");
+                row.className = "person-row";
+
+                const checkboxId = `personCheck${index}`;
+                const amountId = `personAmount${index}`;
+
+                row.innerHTML = `
+                    <div class="person-check">
+                        <input
+                            type="checkbox"
+                            class="person-checkbox"
+                            id="${checkboxId}"
+                            value="${escapeHTML(person.username)}"
+                            checked
+                        >
+                        <label for="${checkboxId}">
+                            ${escapeHTML(person.name || person.username)}
+                        </label>
+                    </div>
+
+                    <div class="person-amount-input">
+                        <span>₹</span>
+                        <input
+                            type="number"
+                            class="given-amount"
+                            id="${amountId}"
+                            data-person="${escapeHTML(person.username)}"
+                            min="0"
+                            step="0.01"
+                            value="0.00"
+                        >
+                    </div>
+                `;
+
+                splitPeopleContainer.appendChild(row);
+            });
+        }
+    }
+
+    // Refresh references AFTER creating the dynamic elements.
+    checkboxes = Array.from(
+        document.querySelectorAll(".person-checkbox")
+    );
+
+    amountInputs = Array.from(
+        document.querySelectorAll(".given-amount")
+    );
+
+    checkboxes.forEach(function (checkbox) {
+        const input = getPersonInput(checkbox.value);
+
+        if (input) {
+            input.disabled = !checkbox.checked;
+        }
+    });
+
+    updateToggleButton();
+}
+
+// ========================================
+// AMOUNT CALCULATION
+// ========================================
+
+function calculateAmounts() {
+    const total = Number(totalAmount?.value) || 0;
+
+    let givenInPaise = 0;
+
+    amountInputs.forEach(function (input) {
+        if (!input.disabled) {
+            const amount = Number(input.value);
+
+            if (Number.isFinite(amount) && amount >= 0) {
+                givenInPaise += Math.round(amount * 100);
+            }
+        }
+    });
+
+    const totalInPaise = Math.round(total * 100);
+    const differenceInPaise = totalInPaise - givenInPaise;
+
+    if (displayTotal) {
+        displayTotal.textContent = formatCurrency(total);
+    }
+
+    if (displayGiven) {
+        displayGiven.textContent = formatCurrency(givenInPaise / 100);
+    }
+
+    if (displayDifference) {
+        displayDifference.textContent =
+            formatCurrency(Math.abs(differenceInPaise) / 100);
+    }
+
+    if (totalInPaise <= 0) {
+        displayFormMessage("", "");
+        return false;
+    }
+
+    if (differenceInPaise === 0) {
+        displayFormMessage("✓ Amounts are correct.", "success");
+        return true;
+    }
+
+    if (differenceInPaise > 0) {
+        displayFormMessage(
+            "⚠ " + formatCurrency(differenceInPaise / 100) +
+            " is still remaining.",
+            "warning"
+        );
+        return false;
+    }
+
+    displayFormMessage(
+        "⚠ Given amount exceeds the total by " +
+        formatCurrency(Math.abs(differenceInPaise) / 100) + ".",
+        "error"
+    );
+
+    return false;
+}
 
 function redistributeAmount() {
-    const total = Number(totalAmount.value) || 0;
+    const total = Number(totalAmount?.value) || 0;
 
-    const selectedPeople = Array.from(checkboxes).filter(
-        function (checkbox) {
-            return checkbox.checked;
-        }
+    const selectedPeople = checkboxes.filter(
+        checkbox => checkbox.checked
     );
 
     if (selectedPeople.length === 0 || total <= 0) {
@@ -131,14 +324,13 @@ function redistributeAmount() {
 
     // Work in paise to avoid rounding errors.
     const totalInPaise = Math.round(total * 100);
-    const peopleCount = selectedPeople.length;
-
-    const baseAmount = Math.floor(totalInPaise / peopleCount);
-    const remainder = totalInPaise % peopleCount;
+    const baseAmount = Math.floor(
+        totalInPaise / selectedPeople.length
+    );
+    const remainder = totalInPaise % selectedPeople.length;
 
     selectedPeople.forEach(function (checkbox, index) {
         const input = getPersonInput(checkbox.value);
-
         if (!input) return;
 
         let amountInPaise = baseAmount;
@@ -166,69 +358,81 @@ function redistributeAmount() {
 }
 
 // ========================================
-// CALCULATE AMOUNTS
+// SELECT / UNSELECT ALL
 // ========================================
 
-function calculateAmounts() {
-    const total = Number(totalAmount.value) || 0;
+function updateToggleButton() {
+    if (!togglePeopleBtn) return;
 
-    let givenInPaise = 0;
+    const allSelected =
+        checkboxes.length > 0 &&
+        checkboxes.every(checkbox => checkbox.checked);
 
-    amountInputs.forEach(function (input) {
-        if (!input.disabled) {
-            const amount = Number(input.value) || 0;
-            givenInPaise += Math.round(amount * 100);
+    togglePeopleBtn.textContent =
+        allSelected ? "Unselect All" : "Select All";
+}
+
+function toggleAllPeople() {
+    const allSelected =
+        checkboxes.length > 0 &&
+        checkboxes.every(checkbox => checkbox.checked);
+
+    checkboxes.forEach(function (checkbox) {
+        checkbox.checked = !allSelected;
+
+        const input = getPersonInput(checkbox.value);
+
+        if (input) {
+            input.disabled = allSelected;
+
+            if (allSelected) {
+                input.value = "0.00";
+            }
         }
     });
 
-    const totalInPaise = Math.round(total * 100);
-    const differenceInPaise = totalInPaise - givenInPaise;
+    redistributeAmount();
+    updateToggleButton();
+}
 
-    if (displayTotal) {
-        displayTotal.textContent = formatCurrency(total);
-    }
+window.toggleAllPeople = toggleAllPeople;
 
-    if (displayGiven) {
-        displayGiven.textContent = formatCurrency(
-            givenInPaise / 100
-        );
-    }
+if (togglePeopleBtn) {
+    togglePeopleBtn.addEventListener("click", toggleAllPeople);
+}
 
-    if (displayDifference) {
-        displayDifference.textContent = formatCurrency(
-            Math.abs(differenceInPaise) / 100
-        );
-    }
+// ========================================
+// DYNAMIC SPLIT INPUT EVENTS
+// ========================================
 
-    if (totalInPaise <= 0) {
-        displayFormMessage("", "");
-        return false;
-    }
+if (splitPeopleContainer) {
+    splitPeopleContainer.addEventListener("change", function (event) {
+        if (!event.target.matches(".person-checkbox")) return;
 
-    if (differenceInPaise === 0) {
-        displayFormMessage("✓ Amounts are correct.", "success");
-        return true;
-    }
+        const checkbox = event.target;
+        const input = getPersonInput(checkbox.value);
 
-    if (differenceInPaise > 0) {
-        displayFormMessage(
-            "⚠ " +
-                formatCurrency(differenceInPaise / 100) +
-                " is still remaining.",
-            "warning"
-        );
+        if (input) {
+            input.disabled = !checkbox.checked;
 
-        return false;
-    }
+            if (!checkbox.checked) {
+                input.value = "0.00";
+            }
+        }
 
-    displayFormMessage(
-        "⚠ Given amount exceeds the total by " +
-            formatCurrency(Math.abs(differenceInPaise) / 100) +
-            ".",
-        "error"
-    );
+        redistributeAmount();
+        updateToggleButton();
+    });
 
-    return false;
+    splitPeopleContainer.addEventListener("input", function (event) {
+        if (event.target.matches(".given-amount")) {
+            calculateAmounts();
+        }
+    });
+}
+
+if (totalAmount) {
+    totalAmount.addEventListener("input", redistributeAmount);
 }
 
 // ========================================
@@ -238,106 +442,59 @@ function calculateAmounts() {
 async function loadExpenseForEdit() {
     if (!isEditMode) return;
 
-    const token = getToken();
+    const data = await apiRequest("/api/expenses");
 
-    if (!token) {
-        await showMessageBox(
-            "Please log in again.",
-            "error",
-            "Session Expired"
-        );
+    const expenses = Array.isArray(data)
+        ? data
+        : data.expenses || [];
 
-        window.location.href = "../index.html";
-        return;
-    }
-
-    let expense;
-
-    try {
-        const response = await fetch(`${API_URL}/api/expenses`, {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(
-                data.error || "Unable to load expenses."
-            );
-        }
-
-        const expenses = Array.isArray(data)
-            ? data
-            : data.expenses || [];
-
-        expense = expenses.find(function (item) {
-            return String(item.id) === String(editExpenseId);
-        });
-    } catch (error) {
-        await showMessageBox(
-            error.message || "Unable to connect to the server.",
-            "error",
-            "Load Failed"
-        );
-
-        return;
-    }
+    const expense = expenses.find(
+        item => String(item.id) === String(editExpenseId)
+    );
 
     if (!expense) {
-        await showMessageBox(
-            "The selected expense could not be found.",
-            "error",
-            "Expense Not Found"
-        );
-
-        window.location.href = "all-expenses.html";
-        return;
+        throw new Error("The selected expense could not be found.");
     }
 
-    // Fill basic information.
-    document.getElementById("category").value =
-        expense.category || "";
+    document.getElementById("category").value = expense.category || "";
+    document.getElementById("expenseDate").value = expense.date || "";
+    document.getElementById("expenseName").value = expense.name || "";
+    totalAmount.value = Number(expense.totalAmount || 0).toFixed(2);
+    document.getElementById("details").value = expense.details || "";
 
-    document.getElementById("expenseDate").value =
-        expense.date || "";
-
-    document.getElementById("expenseName").value =
-        expense.name || "";
-
-    document.getElementById("totalAmount").value =
-        Number(expense.totalAmount || 0).toFixed(2);
-
-    document.getElementById("spentBy").value =
-        expense.spentBy || "";
-
-    document.getElementById("details").value =
-        expense.details || "";
-
-    // API returns "splits". Also support older "split" data.
     const splitAmounts = expense.splits || expense.split || {};
 
+    // Include the historical payer even if the account is now disabled.
+    // This keeps old expenses viewable and editable.
+    const payer = expense.spentBy || "";
+
+    if (
+        payer &&
+        !Array.from(spentBySelect.options).some(
+            option => option.value === payer
+        )
+    ) {
+        const option = document.createElement("option");
+        option.value = payer;
+        option.textContent = `${payer} (historical account)`;
+        spentBySelect.appendChild(option);
+    }
+
+    spentBySelect.value = payer;
+
     checkboxes.forEach(function (checkbox) {
-        const person = checkbox.value;
-        const input = getPersonInput(person);
-        const amount = Number(splitAmounts[person] || 0);
+        const input = getPersonInput(checkbox.value);
+        const amount = Number(splitAmounts[checkbox.value] || 0);
 
-        if (amount > 0) {
-            checkbox.checked = true;
+        checkbox.checked =
+            Object.prototype.hasOwnProperty.call(
+                splitAmounts,
+                checkbox.value
+            ) && amount > 0;
 
-            if (input) {
-                input.disabled = false;
-                input.value = amount.toFixed(2);
-            }
-        } else {
-            checkbox.checked = false;
-
-            if (input) {
-                input.disabled = true;
-                input.value = "0.00";
-            }
+        if (input) {
+            input.value = amount.toFixed(2);
+            input.disabled = !checkbox.checked;
         }
     });
 
@@ -359,105 +516,16 @@ async function loadExpenseForEdit() {
 }
 
 // ========================================
-// PERSON CHECKBOX CHANGE
-// ========================================
-
-checkboxes.forEach(function (checkbox) {
-    checkbox.addEventListener("change", function () {
-        const input = getPersonInput(this.value);
-
-        if (input) {
-            input.disabled = !this.checked;
-
-            if (!this.checked) {
-                input.value = "0.00";
-            }
-        }
-
-        redistributeAmount();
-        updateToggleButton();
-    });
-});
-
-// ========================================
-// AMOUNT INPUT CHANGE
-// ========================================
-
-amountInputs.forEach(function (input) {
-    input.addEventListener("input", calculateAmounts);
-});
-
-// ========================================
-// TOTAL AMOUNT CHANGE
-// ========================================
-
-if (totalAmount) {
-    totalAmount.addEventListener("input", function () {
-        redistributeAmount();
-    });
-}
-
-// ========================================
-// SELECT / UNSELECT ALL
-// ========================================
-
-function toggleAllPeople() {
-    const allSelected = Array.from(checkboxes).every(
-        function (checkbox) {
-            return checkbox.checked;
-        }
-    );
-
-    checkboxes.forEach(function (checkbox) {
-        const input = getPersonInput(checkbox.value);
-
-        checkbox.checked = !allSelected;
-
-        if (input) {
-            input.disabled = allSelected;
-
-            if (allSelected) {
-                input.value = "0.00";
-            }
-        }
-    });
-
-    redistributeAmount();
-    updateToggleButton();
-}
-
-// Keep compatibility with HTML using onclick="toggleAllPeople()".
-window.toggleAllPeople = toggleAllPeople;
-
-// ========================================
-// UPDATE SELECT BUTTON TEXT
-// ========================================
-
-function updateToggleButton() {
-    if (!togglePeopleBtn) return;
-
-    const allSelected = Array.from(checkboxes).every(
-        function (checkbox) {
-            return checkbox.checked;
-        }
-    );
-
-    togglePeopleBtn.textContent = allSelected
-        ? "Unselect All"
-        : "Select All";
-}
-
-// ========================================
-// SAVE / UPDATE EXPENSE THROUGH API
+// SAVE / UPDATE EXPENSE
 // ========================================
 
 if (expenseForm) {
     expenseForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
-        const token = getToken();
+        if (isSaving) return;
 
-        if (!token) {
+        if (!getToken()) {
             await showMessageBox(
                 "Please log in again.",
                 "error",
@@ -480,21 +548,29 @@ if (expenseForm) {
 
         const split = {};
         let givenInPaise = 0;
+        let invalidAmount = false;
 
         amountInputs.forEach(function (input) {
-            if (!input.disabled) {
-                const amount = Number(input.value);
+            if (input.disabled) return;
 
-                if (!Number.isFinite(amount) || amount < 0) {
-                    return;
-                }
+            const amount = Number(input.value);
 
-                givenInPaise += Math.round(amount * 100);
-                split[input.dataset.person] = Number(amount.toFixed(2));
+            if (!Number.isFinite(amount) || amount < 0) {
+                invalidAmount = true;
+                return;
             }
+
+            givenInPaise += Math.round(amount * 100);
+            split[input.dataset.person] = Number(amount.toFixed(2));
         });
 
-        const totalInPaise = Math.round(total * 100);
+        if (invalidAmount) {
+            displayFormMessage(
+                "Enter valid, non-negative amounts for selected people.",
+                "error"
+            );
+            return;
+        }
 
         if (Object.keys(split).length === 0) {
             displayFormMessage(
@@ -504,7 +580,7 @@ if (expenseForm) {
             return;
         }
 
-        if (givenInPaise !== totalInPaise) {
+        if (givenInPaise !== Math.round(total * 100)) {
             displayFormMessage(
                 "Please make sure Total Given equals Total Expense.",
                 "error"
@@ -515,7 +591,7 @@ if (expenseForm) {
         const category = document.getElementById("category").value;
         const name = document.getElementById("expenseName").value.trim();
         const date = document.getElementById("expenseDate").value;
-        const spentBy = document.getElementById("spentBy").value;
+        const spentBy = spentBySelect.value;
         const details = document.getElementById("details").value.trim();
 
         if (!category || !name || !date || !spentBy) {
@@ -526,14 +602,13 @@ if (expenseForm) {
             return;
         }
 
-        // Match the Cloudflare Worker API format.
         const apiExpense = {
-            category: category,
-            name: name,
-            date: date,
+            category,
+            name,
+            date,
             totalAmount: total,
-            spentBy: spentBy,
-            details: details,
+            spentBy,
+            details,
             splits: split
         };
 
@@ -541,24 +616,25 @@ if (expenseForm) {
             ? `${API_URL}/api/expenses/${encodeURIComponent(editExpenseId)}`
             : `${API_URL}/api/expenses`;
 
+        isSaving = true;
+
         try {
             if (submitButton) {
                 submitButton.disabled = true;
-                submitButton.textContent = isEditMode
-                    ? "Updating..."
-                    : "Saving...";
+                submitButton.textContent =
+                    isEditMode ? "Updating..." : "Saving...";
             }
 
             const response = await fetch(url, {
                 method: isEditMode ? "PUT" : "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+                    Authorization: `Bearer ${getToken()}`
                 },
                 body: JSON.stringify(apiExpense)
             });
 
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
                 throw new Error(
@@ -566,35 +642,34 @@ if (expenseForm) {
                 );
             }
 
-            if (isEditMode) {
-                localStorage.removeItem("editExpenseId");
+            localStorage.removeItem("editExpenseId");
 
-                await showMessageBox(
-                    "Expense updated successfully!",
-                    "success",
-                    "Expense Updated"
-                );
-            } else {
-                await showMessageBox(
-                    "Expense saved successfully!",
-                    "success",
-                    "Expense Saved"
-                );
-            }
+            await showMessageBox(
+                isEditMode
+                    ? "Expense updated successfully!"
+                    : "Expense saved successfully!",
+                "success",
+                isEditMode ? "Expense Updated" : "Expense Saved"
+            );
 
             window.location.href = "admin-dashboard.html";
+
         } catch (error) {
+            console.error("Saving expense failed:", error);
+
             await showMessageBox(
                 error.message || "Unable to connect to the server.",
                 "error",
                 "Save Failed"
             );
+
         } finally {
+            isSaving = false;
+
             if (submitButton) {
                 submitButton.disabled = false;
-                submitButton.textContent = isEditMode
-                    ? "💾 Update Expense"
-                    : "Save Expense";
+                submitButton.textContent =
+                    isEditMode ? "💾 Update Expense" : "Save Expense";
             }
         }
     });
@@ -621,12 +696,42 @@ if (headerBackButton) {
 }
 
 // ========================================
-// INITIAL LOAD
+// INITIALIZE PAGE
 // ========================================
 
-if (isEditMode) {
-    loadExpenseForEdit();
-} else {
-    updateToggleButton();
-    redistributeAmount();
+async function initializeExpenseForm() {
+    try {
+        await loadPeople();
+
+        if (isEditMode) {
+            await loadExpenseForEdit();
+        } else {
+            redistributeAmount();
+            updateToggleButton();
+        }
+
+    } catch (error) {
+        console.error("Expense form initialization failed:", error);
+
+        await showMessageBox(
+            error.message || "Unable to load people from the server.",
+            "error",
+            "Loading Failed"
+        );
+
+        if (spentBySelect) {
+            spentBySelect.innerHTML =
+                '<option value="">Unable to load people</option>';
+        }
+
+        if (splitPeopleContainer) {
+            splitPeopleContainer.innerHTML = `
+                <p class="form-message error">
+                    Unable to load people. Refresh the page and try again.
+                </p>
+            `;
+        }
+    }
 }
+
+initializeExpenseForm();

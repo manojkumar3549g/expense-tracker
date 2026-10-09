@@ -1,0 +1,14 @@
+ .gitignore              |    7 [32m+[m
+ js/add-expense.js       |  996 [32m++++++++++++[m[31m-----------------------------[m
+ js/admin-dashboard.js   |  179 [32m+++++[m[31m---[m
+ js/all-expenses.js      |  813 [32m+++++++++++++[m[31m---------------------[m
+ js/change-requests.js   | 1129 [32m++++++++++++++++[m[31m-------------------------------[m
+ js/final-bill.js        |  642 [32m++++++++++[m[31m-----------------[m
+ js/notifications.js     |  378 [32m++++++[m[31m----------[m
+ js/people.js            |  885 [32m+++++++++++++++[m[31m----------------------[m
+ js/person-dashboard.js  |  385 [32m+++++++[m[31m---------[m
+ js/personal-expenses.js |  681 [32m+++++++++++[m[31m-----------------[m
+ js/request-change.js    |  881 [32m++++++++++++++[m[31m----------------------[m
+ js/script.js            |  156 [32m++++[m[31m---[m
+ worker.js               |   72 [32m+++[m
+ 13 files changed, 2732 insertions(+), 4472 deletions(-)
