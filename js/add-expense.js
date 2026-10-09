@@ -355,21 +355,49 @@ async function loadExpenseForEdit() {
     }
 
 
-    const expenses =
-        JSON.parse(
-            localStorage.getItem("expenses") || "[]"
-        );
+    
+    const API_URL =
+        "https://expense-tracker-api.manojkumar3549g.workers.dev";
 
+    const token = localStorage.getItem("authToken");
 
-    const expense =
-        expenses.find(
-            function (item) {
+    let expense = null;
 
-                return String(item.id) ===
-                    String(editExpenseId);
-
+    try {
+        const response = await fetch(
+            `${API_URL}/api/expenses`,
+            {
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
             }
         );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error || "Unable to load expenses."
+            );
+        }
+
+        const expenses = Array.isArray(data)
+            ? data
+            : data.expenses || [];
+
+        expense = expenses.find(function (item) {
+            return String(item.id) === String(editExpenseId);
+        });
+
+    } catch (error) {
+        await showAlert(
+            error.message || "Unable to connect to the server.",
+            "error",
+            "Load Failed"
+        );
+        return;
+    }
+
 
 
     // Expense not found
@@ -430,60 +458,41 @@ if (!expense) {
         expense.details || "";
 
 
+    
     // ========================================
     // FILL SPLIT
     // ========================================
 
-    checkboxes.forEach(
-        function (checkbox) {
+    const splitAmounts = expense.splits || expense.split || {};
 
-            const person =
-                checkbox.value;
+    checkboxes.forEach(function (checkbox) {
+        const person = checkbox.value;
 
-            const input =
-                document.querySelector(
-                    `.given-amount[data-person="${person}"]`
-                );
+        const input = document.querySelector(
+            `.given-amount[data-person="${person}"]`
+        );
 
+        const amount = splitAmounts[person] !== undefined
+            ? Number(splitAmounts[person])
+            : 0;
 
-            const amount =
-                expense.split &&
-                expense.split[person] !== undefined
-                    ? Number(
-                        expense.split[person]
-                    )
-                    : 0;
+        if (amount > 0) {
+            checkbox.checked = true;
 
-
-            if (amount > 0) {
-
-                checkbox.checked = true;
-
-                if (input) {
-
-                    input.disabled = false;
-
-                    input.value =
-                        amount.toFixed(2);
-
-                }
-
-            } else {
-
-                checkbox.checked = false;
-
-                if (input) {
-
-                    input.disabled = true;
-
-                    input.value = "0.00";
-
-                }
-
+            if (input) {
+                input.disabled = false;
+                input.value = amount.toFixed(2);
             }
+        } else {
+            checkbox.checked = false;
 
+            if (input) {
+                input.disabled = true;
+                input.value = "0.00";
+            }
         }
-    );
+    });
+
 
 
     // ========================================
@@ -564,15 +573,7 @@ checkboxes.forEach(
                 // In Edit mode, don't automatically
                 // destroy the existing split.
 
-                if (isEditMode) {
-
-                    calculateAmounts();
-
-                } else {
-
-                    redistributeAmount();
-
-                }
+                redistributeAmount();
 
 
                 updateToggleButton();
@@ -874,100 +875,91 @@ expenseForm.addEventListener(
         // EDIT EXISTING
         // ========================================
 
-        if (isEditMode) {
+        
+        // ========================================
+        // SAVE THROUGH CLOUDFLARE API
+        // ========================================
 
-            const index =
-                expenses.findIndex(
-                    function (item) {
+        const API_URL =
+            "https://expense-tracker-api.manojkumar3549g.workers.dev";
 
-                        return String(item.id) ===
-                            String(editExpenseId);
+        const token = localStorage.getItem("authToken");
 
-                    }
+        if (!token) {
+            await showAlert(
+                "Please log in again.",
+                "error",
+                "Session Expired"
+            );
+            window.location.href = "../index.html";
+            return;
+        }
+
+        // Convert the existing form data to the API format.
+        const apiExpense = {
+            category: expenseData.category,
+            name: expenseData.name,
+            date: expenseData.date,
+            totalAmount: Number(expenseData.totalAmount),
+            spentBy: expenseData.spentBy,
+            details: expenseData.details || "",
+            splits: expenseData.split || {}
+        };
+
+        const url = isEditMode
+            ? `${API_URL}/api/expenses/${encodeURIComponent(editExpenseId)}`
+            : `${API_URL}/api/expenses`;
+
+        try {
+            const response = await fetch(url, {
+                method: isEditMode ? "PUT" : "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify(apiExpense)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Unable to save the expense."
                 );
-
-
-            if (index === -1) {
-
-                await showAlert(
-    "The selected expense could not be found.",
-    "error",
-    "Expense Not Found"
-);
-
-                return;
             }
 
+            // Clear edit mode after a successful server save.
+            if (isEditMode) {
+                localStorage.removeItem("editExpenseId");
 
-            // Keep original creation date
+                await showAlert(
+                    "Expense updated successfully!",
+                    "success",
+                    "Expense Updated"
+                );
+            } else {
+                await showAlert(
+                    "Expense saved successfully!",
+                    "success",
+                    "Expense Saved"
+                );
+            }
 
-            expenseData.createdAt =
-                expenses[index].createdAt ||
-                new Date().toISOString();
+            window.location.href = "admin-dashboard.html";
 
-
-            // UPDATE EXISTING
-
-            expenses[index] =
-                expenseData;
-
-
-            localStorage.setItem(
-                "expenses",
-                JSON.stringify(expenses)
-            );
-
-
-            // Clear edit mode
-
-            localStorage.removeItem(
-                "editExpenseId"
-            );
-
-
+        } catch (error) {
             await showAlert(
-    "Expense updated successfully!",
-    "success",
-    "Expense Updated"
-);
-
-
-        } else {
-
-            // ========================================
-            // ADD NEW
-            // ========================================
-
-            expenseData.createdAt =
-                new Date().toISOString();
-
-
-            expenses.push(
-                expenseData
+                error.message || "Unable to connect to the server.",
+                "error",
+                "Save Failed"
             );
-
-
-            localStorage.setItem(
-                "expenses",
-                JSON.stringify(expenses)
-            );
-
-
-            await showAlert(
-    "Expense saved successfully!",
-    "success",
-    "Expense Saved"
-);
-
         }
 
 
-        // ========================================
-        // GO BACK TO ALL EXPENSES
-        // ========================================
 
-        window.location.href =
-            "all-expenses.html";
+
+
+       
 
     }
 );

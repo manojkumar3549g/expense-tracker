@@ -76,14 +76,56 @@ const people = {
 };
 
 
-// ----------------------------------------
-// LOAD EXPENSES
-// ----------------------------------------
 
-let expenses =
-    JSON.parse(
-        localStorage.getItem("expenses") || "[]"
-    );
+ // ----------------------------------------
+ // LOAD EXPENSES FROM CLOUDFLARE
+ // ----------------------------------------
+
+ let expenses = [];
+
+ async function loadExpenses() {
+     const API_URL =
+         "https://expense-tracker-api.manojkumar3549g.workers.dev";
+
+     const token = localStorage.getItem("authToken");
+
+     if (!token) {
+         window.location.href = "../index.html";
+         return;
+     }
+
+     try {
+         const response = await fetch(
+             `${API_URL}/api/expenses`,
+             {
+                 method: "GET",
+                 headers: {
+                     "Authorization": `Bearer ${token}`
+                 }
+             }
+         );
+
+         const data = await response.json();
+
+         if (!response.ok) {
+             throw new Error(
+                 data.error || "Unable to load expenses."
+             );
+         }
+
+         expenses = Array.isArray(data)
+             ? data
+             : data.expenses || [];
+
+         renderExpenses();
+
+     } catch (error) {
+         console.error("Loading expenses failed:", error);
+         expensesContainer.innerHTML =
+             '<div class="empty-state"><h3>Unable to load expenses</h3><p>Please refresh the page and try again.</p></div>';
+     }
+ }
+
 
 
 // ----------------------------------------
@@ -133,7 +175,7 @@ clearFilters.addEventListener(
 
         dateFilter.value = "";
 
-        renderExpenses();
+        loadExpenses();
 
     }
 );
@@ -215,17 +257,11 @@ function updateSummary(filteredExpenses) {
                 Number(expense.totalAmount) || 0;
 
 
-            if (
-                expense.split &&
-                expense.split[username]
-            ) {
+            const splitAmounts = expense.splits || expense.split || {};
 
-                given +=
-                    Number(
-                        expense.split[username]
-                    ) || 0;
-
-            }
+if (splitAmounts[username]) {
+    given += Number(splitAmounts[username]) || 0;
+}
 
         }
     );
@@ -516,13 +552,13 @@ function createSplitHTML(expense) {
     Object.keys(people).forEach(
         function (person) {
 
-            const amount =
-                expense.split &&
-                expense.split[person]
-                    ? Number(
-                        expense.split[person]
-                    )
-                    : 0;
+            
+const splitAmounts = expense.splits || expense.split || {};
+
+const amount = splitAmounts[person] !== undefined
+    ? Number(splitAmounts[person])
+    : 0;
+
 
 
             html += `
@@ -710,4 +746,4 @@ function escapeHTML(value) {
 // INITIAL LOAD
 // ----------------------------------------
 
-renderExpenses();
+loadExpenses();
