@@ -6,17 +6,27 @@
 const API_URL =
     "https://expense-tracker-api.manojkumar3549g.workers.dev";
 
-// ========================================
+
+ // ========================================
 // LOGIN
 // ========================================
 
-const username = localStorage.getItem("loggedInUser");
-const role = localStorage.getItem("userRole");
-const token = localStorage.getItem("authToken");
+const username =
+    sessionStorage.getItem("loggedInUser") ||
+    localStorage.getItem("loggedInUser");
+
+const role =
+    sessionStorage.getItem("userRole") ||
+    localStorage.getItem("userRole");
+
+const token =
+    sessionStorage.getItem("authToken") ||
+    localStorage.getItem("authToken");
 
 if (!username || !role || !token) {
     window.location.href = "../index.html";
 }
+
 
 // ========================================
 // ELEMENTS

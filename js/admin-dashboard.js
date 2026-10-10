@@ -8,12 +8,23 @@
 const API_URL =
     "https://expense-tracker-api.manojkumar3549g.workers.dev";
 
-const token = localStorage.getItem("authToken");
-const role = localStorage.getItem("userRole");
 
-if (role !== "admin" || !token) {
+const username =
+    sessionStorage.getItem("loggedInUser") ||
+    localStorage.getItem("loggedInUser");
+
+const role =
+    sessionStorage.getItem("userRole") ||
+    localStorage.getItem("userRole");
+
+const token =
+    sessionStorage.getItem("authToken") ||
+    localStorage.getItem("authToken");
+
+if (!username || role !== "admin" || !token) {
     window.location.href = "../index.html";
 }
+
 
 // ========================================
 // HELPERS
@@ -25,21 +36,28 @@ function escapeHTML(value) {
     return div.innerHTML;
 }
 
+
 async function apiRequest(path) {
+    const token =
+        sessionStorage.getItem("authToken") ||
+        localStorage.getItem("authToken");
+
     const response = await fetch(`${API_URL}${path}`, {
         method: "GET",
         headers: {
-            Authorization: `Bearer ${localStorage.getItem("authToken") || ""}`
+            Authorization: `Bearer ${token || ""}`
         }
     });
 
     const data = await response.json().catch(() => ({}));
 
     if (response.status === 401) {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("loggedInUser");
-        localStorage.removeItem("userRole");
-        localStorage.removeItem("personName");
+        for (const storage of [localStorage, sessionStorage]) {
+            storage.removeItem("authToken");
+            storage.removeItem("loggedInUser");
+            storage.removeItem("userRole");
+            storage.removeItem("personName");
+        }
 
         window.location.href = "../index.html";
         throw new Error("Session expired. Please log in again.");
@@ -51,6 +69,7 @@ async function apiRequest(path) {
 
     return data;
 }
+
 
 function formatAmount(amount) {
     return "₹" + Number(amount || 0).toLocaleString("en-IN", {
@@ -454,14 +473,18 @@ async function loadRecentRequests() {
 // LOGOUT
 // ========================================
 
+
 function logout() {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("loggedInUser");
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("personName");
+    for (const storage of [localStorage, sessionStorage]) {
+        storage.removeItem("authToken");
+        storage.removeItem("loggedInUser");
+        storage.removeItem("userRole");
+        storage.removeItem("personName");
+    }
 
     window.location.href = "../index.html";
 }
+
 
 window.logout = logout;
 

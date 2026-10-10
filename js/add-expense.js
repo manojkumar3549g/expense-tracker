@@ -53,9 +53,14 @@ let isSaving = false;
 // HELPERS
 // ========================================
 
+
 function getToken() {
-    return localStorage.getItem("authToken");
+    return (
+        sessionStorage.getItem("authToken") ||
+        localStorage.getItem("authToken")
+    );
 }
+
 
 function getPersonInput(username) {
     return Array.from(
@@ -111,15 +116,19 @@ async function apiRequest(path, options = {}) {
 
     const data = await response.json().catch(() => ({}));
 
-    if (response.status === 401) {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("loggedInUser");
-        localStorage.removeItem("userRole");
-        localStorage.removeItem("personName");
-
-        window.location.href = "../index.html";
-        throw new Error("Session expired. Please log in again.");
+    
+if (response.status === 401) {
+    for (const storage of [localStorage, sessionStorage]) {
+        storage.removeItem("authToken");
+        storage.removeItem("loggedInUser");
+        storage.removeItem("userRole");
+        storage.removeItem("personName");
     }
+
+    window.location.href = "../index.html";
+    throw new Error("Session expired. Please log in again.");
+}
+
 
     if (!response.ok) {
         throw new Error(data.error || "Request failed.");

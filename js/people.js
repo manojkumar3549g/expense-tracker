@@ -71,15 +71,16 @@ async function confirmAction(message) {
     return window.confirm(message);
 }
 
-// ========================================
-// API REQUEST
-// ========================================
 
 async function apiRequest(path, options = {}) {
+    const token =
+        sessionStorage.getItem("authToken") ||
+        localStorage.getItem("authToken");
+
     const response = await fetch(`${API_URL}${path}`, {
         ...options,
         headers: {
-            Authorization: `Bearer ${localStorage.getItem("authToken") || ""}`,
+            Authorization: `Bearer ${token || ""}`,
             ...(options.body
                 ? { "Content-Type": "application/json" }
                 : {}),
@@ -90,10 +91,12 @@ async function apiRequest(path, options = {}) {
     const data = await response.json().catch(() => ({}));
 
     if (response.status === 401) {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("loggedInUser");
-        localStorage.removeItem("userRole");
-        localStorage.removeItem("personName");
+        for (const storage of [localStorage, sessionStorage]) {
+            storage.removeItem("authToken");
+            storage.removeItem("loggedInUser");
+            storage.removeItem("userRole");
+            storage.removeItem("personName");
+        }
 
         window.location.href = "../index.html";
         throw new Error("Your session has expired. Please log in again.");
@@ -261,14 +264,27 @@ function createPersonCard(person) {
             >✏️ Edit</button>
 
             
+
 <button
     type="button"
     class="person-action-btn toggle-person"
     data-action="toggle"
     data-username="${escapeHTML(person.username)}"
 >
-    ${person.active ? "Disable Account" : "Enable Account"}
+    ${person.active ? "🚫Disable Account" : "✔️Enable Account"}
 </button>
+
+<button
+    type="button"
+    class="person-action-btn delete-person"
+    data-action="delete"
+    data-username="${escapeHTML(person.username)}"
+>
+    🗑️ Delete
+</button>
+
+
+
 
         </div>
     `;
@@ -293,6 +309,8 @@ if (peopleGrid) {
             editPerson(username);
         } else if (action === "toggle") {
             togglePerson(username);
+        } else if (action === "delete") {
+            deletePerson(username);
         }
     });
 }
@@ -644,6 +662,62 @@ async function togglePerson(username) {
 
 window.togglePerson = togglePerson;
 
+
+async function deletePerson(username) {
+    const person = people.find(p => p.username === username);
+
+    if (!person) {
+        await showMessage(
+            "Person not found.",
+            "error",
+            "Delete Failed"
+        );
+        return;
+    }
+
+    if (person.role === "admin") {
+        await showMessage(
+            "The admin account cannot be deleted.",
+            "warning",
+            "Action Not Allowed"
+        );
+        return;
+    }
+
+    const confirmed = await confirmAction(
+        `Permanently delete ${person.name} (${username})? ` +
+        "Deletion is allowed only if the account has no historical records."
+    );
+
+    if (!confirmed) return;
+
+    try {
+        await apiRequest(
+            `/api/people/${encodeURIComponent(username)}`,
+            { method: "DELETE" }
+        );
+
+        await showMessage(
+            `${person.name}'s account was deleted successfully.`,
+            "success",
+            "Account Deleted"
+        );
+
+        await loadPeople();
+
+    } catch (error) {
+        console.error("Deleting account failed:", error);
+
+        await showMessage(
+            error.message ||
+            "This account may have historical records. Disable it instead.",
+            "warning",
+            "Cannot Delete Account"
+        );
+    }
+}
+
+window.deletePerson = deletePerson;
 
 // ========================================
 // ESCAPE ATTRIBUTE

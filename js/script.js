@@ -8,6 +8,7 @@ if (loginForm) {
 
         const usernameInput = document.getElementById("username");
         const passwordInput = document.getElementById("password");
+        const rememberMeInput = document.getElementById("rememberMe");
         const message = document.getElementById("loginMessage");
 
         if (!usernameInput || !passwordInput || !message) {
@@ -17,6 +18,9 @@ if (loginForm) {
 
         const username = usernameInput.value.trim().toLowerCase();
         const password = passwordInput.value;
+        const rememberMe = rememberMeInput
+            ? rememberMeInput.checked
+            : false;
 
         if (!username || !password) {
             message.style.color = "red";
@@ -73,18 +77,33 @@ if (loginForm) {
                 throw new Error("Invalid response from server.");
             }
 
-            // Store the server-issued authentication details.
-            localStorage.setItem("authToken", data.token);
-            localStorage.setItem("loggedInUser", data.user.username);
-            localStorage.setItem("userRole", data.user.role);
-            localStorage.setItem("personName", data.user.name || data.user.username);
+            // Remove any previous session from both storage types.
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("loggedInUser");
+            localStorage.removeItem("userRole");
+            localStorage.removeItem("personName");
+
+            sessionStorage.removeItem("authToken");
+            sessionStorage.removeItem("loggedInUser");
+            sessionStorage.removeItem("userRole");
+            sessionStorage.removeItem("personName");
+
+            // Remember me = persistent storage.
+            // Unchecked = session-only storage.
+            const storage = rememberMe
+                ? localStorage
+                : sessionStorage;
+
+            storage.setItem("authToken", data.token);
+            storage.setItem("loggedInUser", data.user.username);
+            storage.setItem("userRole", data.user.role);
+            storage.setItem(
+                "personName",
+                data.user.name || data.user.username
+            );
 
             message.style.color = "green";
             message.textContent = "Login successful! Redirecting...";
-
-            if (submitButton) {
-                submitButton.disabled = true;
-            }
 
             if (data.user.role === "admin") {
                 window.location.href = "pages/admin-dashboard.html";
@@ -112,7 +131,9 @@ if (loginForm) {
                     submitButton.tagName === "BUTTON" &&
                     submitButton.dataset.originalText
                 ) {
-                    submitButton.textContent = submitButton.dataset.originalText;
+                    submitButton.textContent =
+                        submitButton.dataset.originalText;
+
                     delete submitButton.dataset.originalText;
                 }
             }

@@ -8,7 +8,11 @@ const API_URL =
 
 const username = localStorage.getItem("loggedInUser");
 const role = localStorage.getItem("userRole");
-const token = localStorage.getItem("authToken");
+
+const token =
+    sessionStorage.getItem("authToken") ||
+    localStorage.getItem("authToken");
+
 
 // ========================================
 // AUTH CHECK

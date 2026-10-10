@@ -4,20 +4,33 @@ const API_URL = "https://expense-tracker-api.manojkumar3549g.workers.dev";
 // PERSONAL EXPENSES
 // ========================================
 
-// ========================================
+
+ // ========================================
 // LOGIN CHECK
 // ========================================
 
-const username = localStorage.getItem("loggedInUser");
-const role = localStorage.getItem("userRole");
-const personName = localStorage.getItem("personName");
-const authToken = localStorage.getItem("authToken");
+const username =
+    sessionStorage.getItem("loggedInUser") ||
+    localStorage.getItem("loggedInUser");
+
+const role =
+    sessionStorage.getItem("userRole") ||
+    localStorage.getItem("userRole");
+
+const personName =
+    sessionStorage.getItem("personName") ||
+    localStorage.getItem("personName");
+
+const authToken =
+    sessionStorage.getItem("authToken") ||
+    localStorage.getItem("authToken");
 
 if (!username || role !== "person" || !authToken) {
     window.location.href = "../index.html";
 } else {
     initializePersonalExpenses();
 }
+
 
 // ========================================
 // PEOPLE
@@ -73,17 +86,20 @@ async function initializePersonalExpenses() {
     }
 }
 
-// ========================================
+
+ // ========================================
 // API REQUEST
 // ========================================
 
 async function apiRequest(endpoint) {
-    const token = localStorage.getItem("authToken");
+    const token =
+        sessionStorage.getItem("authToken") ||
+        localStorage.getItem("authToken");
 
     const response = await fetch(`${API_URL}${endpoint}`, {
         method: "GET",
         headers: {
-            "Authorization": `Bearer ${token}`,
+            "Authorization": `Bearer ${token || ""}`,
             "Content-Type": "application/json"
         }
     });
@@ -97,10 +113,12 @@ async function apiRequest(endpoint) {
     }
 
     if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("loggedInUser");
-        localStorage.removeItem("userRole");
-        localStorage.removeItem("personName");
+        for (const storage of [localStorage, sessionStorage]) {
+            storage.removeItem("authToken");
+            storage.removeItem("loggedInUser");
+            storage.removeItem("userRole");
+            storage.removeItem("personName");
+        }
 
         window.location.href = "../index.html";
 
@@ -113,6 +131,7 @@ async function apiRequest(endpoint) {
 
     return data;
 }
+
 
 // ========================================
 // CALCULATE PERSONAL EXPENSES

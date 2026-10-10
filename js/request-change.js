@@ -1,23 +1,37 @@
 
 const API_URL = "https://expense-tracker-api.manojkumar3549g.workers.dev";
 
-// ========================================
+
+ // ========================================
 // REQUEST CHANGE
 // ========================================
 
 // LOGIN CHECK
 
-const username = localStorage.getItem("loggedInUser");
-const role = localStorage.getItem("userRole");
-const personName = localStorage.getItem("personName");
+const username =
+    sessionStorage.getItem("loggedInUser") ||
+    localStorage.getItem("loggedInUser");
+
+const role =
+    sessionStorage.getItem("userRole") ||
+    localStorage.getItem("userRole");
+
+const personName =
+    sessionStorage.getItem("personName") ||
+    localStorage.getItem("personName");
+
+const authToken =
+    sessionStorage.getItem("authToken") ||
+    localStorage.getItem("authToken");
 
 if (
     !username ||
     role !== "person" ||
-    !localStorage.getItem("authToken")
+    !authToken
 ) {
     window.location.href = "../index.html";
 }
+
 
 // ========================================
 // ELEMENTS
@@ -88,12 +102,15 @@ const topBackBtn = document.getElementById("topBackBtn");
 loadExpenses();
 updateRequestedField();
 
-// ========================================
+
+ // ========================================
 // API REQUEST
 // ========================================
 
 async function apiRequest(endpoint, options = {}) {
-    const token = localStorage.getItem("authToken");
+    const token =
+        sessionStorage.getItem("authToken") ||
+        localStorage.getItem("authToken");
 
     if (!token) {
         redirectToLogin();
@@ -118,6 +135,13 @@ async function apiRequest(endpoint, options = {}) {
     }
 
     if (response.status === 401 || response.status === 403) {
+        for (const storage of [localStorage, sessionStorage]) {
+            storage.removeItem("authToken");
+            storage.removeItem("loggedInUser");
+            storage.removeItem("userRole");
+            storage.removeItem("personName");
+        }
+
         redirectToLogin();
         throw new Error("Your session has expired. Please log in again.");
     }
@@ -130,6 +154,7 @@ async function apiRequest(endpoint, options = {}) {
 
     return data;
 }
+
 
 // ========================================
 // REDIRECT TO LOGIN
